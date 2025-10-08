@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Initialize database and routes on start.
+// Initialize database and routes on start
 setupDatabase();
 app.use('/api/admin', adminRoutes);
 
@@ -25,7 +25,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'Admin service is running' });
 });
 
-// Error handling.
+// Error handling
 app.use((err, req, res, next) => {
     res.status(500).json({
         error: 'Internal server error',
@@ -33,7 +33,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server.
+// Start server
 app.listen(PORT, () => {
     console.log('Admin service running on port ${PORT}');
 });
