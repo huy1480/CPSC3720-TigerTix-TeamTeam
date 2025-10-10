@@ -1,263 +1,38 @@
-/**
- * TigerTix Styles
- * Includes accessibility features: focus indicators, high contrast, clear typography
- */
-
-/* Global Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+.App {
+  text-align: center;
 }
 
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  line-height: 1.6;
-  color: #333;
-  background-color: #f4f4f4;
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
 }
 
-.app {
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-/* Header Styles */
-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
   color: white;
-  padding: 2rem;
-  text-align: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
+.App-link {
+  color: #61dafb;
 }
 
-header p {
-  font-size: 1.1rem;
-  opacity: 0.9;
-}
-
-/* Main Content */
-main {
-  flex: 1;
-  max-width: 1200px;
-  width: 100%;
-  margin: 2rem auto;
-  padding: 0 2rem;
-}
-
-main h2 {
-  font-size: 1.8rem;
-  margin-bottom: 1.5rem;
-  color: #333;
-}
-
-/* Messages */
-.success-message,
-.error-message {
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  border-radius: 8px;
-  font-weight: 500;
-  animation: slideIn 0.3s ease-out;
-}
-
-.success-message {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.error-message {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-@keyframes slideIn {
+@keyframes App-logo-spin {
   from {
-    transform: translateY(-10px);
-    opacity: 0;
+    transform: rotate(0deg);
   }
   to {
-    transform: translateY(0);
-    opacity: 1;
+    transform: rotate(360deg);
   }
-}
-
-/* Events List */
-.events-list {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-/* Event Card */
-.event-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.event-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
-}
-
-.event-card h3 {
-  font-size: 1.5rem;
-  color: #667eea;
-  margin-bottom: 1rem;
-}
-
-.event-details {
-  margin-bottom: 1.5rem;
-}
-
-.event-details p {
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-}
-
-.label {
-  font-weight: 600;
-  color: #555;
-}
-
-/* Buttons */
-button {
-  font-family: inherit;
-  font-size: 1rem;
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 600;
-}
-
-.purchase-button {
-  width: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.purchase-button:hover:not(:disabled) {
-  transform: scale(1.02);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-}
-
-.purchase-button:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.purchase-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.retry-button {
-  background-color: #667eea;
-  color: white;
-  margin-top: 1rem;
-}
-
-.retry-button:hover {
-  background-color: #5568d3;
-}
-
-/* Focus Indicators for Accessibility */
-button:focus,
-a:focus {
-  outline: 3px solid #667eea;
-  outline-offset: 2px;
-}
-
-/* High contrast focus for better visibility */
-button:focus-visible,
-a:focus-visible {
-  outline: 3px solid #667eea;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 5px rgba(102, 126, 234, 0.2);
-}
-
-/* Remove default focus styles for mouse users */
-button:focus:not(:focus-visible),
-a:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Footer */
-footer {
-  background-color: #333;
-  color: white;
-  text-align: center;
-  padding: 1.5rem;
-  margin-top: auto;
-}
-
-/* Loading and Empty States */
-main > p {
-  text-align: center;
-  font-size: 1.2rem;
-  color: #666;
-  padding: 2rem;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  header h1 {
-    font-size: 2rem;
-  }
-
-  .events-list {
-    grid-template-columns: 1fr;
-  }
-
-  main {
-    padding: 0 1rem;
-  }
-}
-
-/* Screen Reader Only Content */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-/* Ensure sufficient color contrast */
-.event-card {
-  color: #333;
-}
-
-/* Skip to main content link for keyboard users */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  background: #667eea;
-  color: white;
-  padding: 8px;
-  text-decoration: none;
-  z-index: 100;
-}
-
-.skip-link:focus {
-  top: 0;
 }
