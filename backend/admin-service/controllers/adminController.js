@@ -1,6 +1,6 @@
 /**
  * Admin Controller
- * Handles logic and request/response for admin operations
+ * Handles business logic and request/response for admin operations
  */
 
 const adminModel = require('../models/adminModel');
@@ -64,6 +64,14 @@ function isValidDate(dateString) {
  */
 async function createEvent(req, res) {
   try {
+    // Check if request body exists
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'Request body is required'
+      });
+    }
+    
     // Validate input data
     const validation = validateEventData(req.body);
     
