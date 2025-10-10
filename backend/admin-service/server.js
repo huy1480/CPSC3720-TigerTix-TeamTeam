@@ -1,9 +1,8 @@
 /**
  * Admin Service Server
- * Main entry point for admin microservice
- * Event creation and management on port 5001
+ * Main entry point for the admin microservice
+ * Handles event creation and management on port 5001
  */
-
 
 const express = require('express');
 const cors = require('cors');
@@ -17,23 +16,31 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Initialize database and routes on start
-setupDatabase();
+// Initialize database on server start
+if (typeof setupDatabase === 'function') {
+  setupDatabase();
+} else {
+  console.error('setupDatabase is not a function');
+}
+
+// Routes
 app.use('/api/admin', adminRoutes);
 
+// Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'Admin service is running' });
+  res.status(200).json({ status: 'Admin service is running' });
 });
 
-// Error handling
+// Global error handler
 app.use((err, req, res, next) => {
-    res.status(500).json({
-        error: 'Internal server error',
-        message: err.message
-    });
+  console.error('Server error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: err.message 
+  });
 });
 
 // Start server
 app.listen(PORT, () => {
-    console.log('Admin service running on port ${PORT}');
+  console.log(`Admin service running on port ${PORT}`);
 });
