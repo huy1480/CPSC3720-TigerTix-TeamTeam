@@ -1,19 +1,18 @@
 /**
  * Database Setup Script
- * Creates necessary tables if they don't exist
- * Runs automatically when the admin service starts
+ * Creates tables if they don't exist
+ * Runs automatically when admin service starts
  */
 
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-// Path to shared database
 const DB_PATH = path.join(__dirname, '../shared-db/database.sqlite');
 
 /**
  * Initialize database and create tables
- * Purpose: Ensures database schema exists before service starts
- * Side effects: Creates events table in shared database
+ * Purpose: Creates database schema before service starts
+ * Creates events table in shared database
  */
 function setupDatabase() {
   const db = new sqlite3.Database(DB_PATH, (err) => {
@@ -24,7 +23,6 @@ function setupDatabase() {
     console.log('Connected to shared SQLite database');
   });
 
-  // SQL query to create events table
   const createEventsTable = `
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +33,6 @@ function setupDatabase() {
     )
   `;
 
-  // Execute table creation
   db.run(createEventsTable, (err) => {
     if (err) {
       console.error('Error creating events table:', err.message);
