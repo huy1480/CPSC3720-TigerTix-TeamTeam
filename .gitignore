@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Database files
+*.sqlite
+*.db
+
+# Environment variables
+.env
+.env.local
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# Build files (React)
+frontend/build/
+frontend/dist/
+
+# Testing
+coverage/
