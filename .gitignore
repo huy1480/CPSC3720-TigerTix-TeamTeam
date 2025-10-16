@@ -26,3 +26,4 @@ frontend/dist/
 
 # Testing
 coverage/
+backend/shared-db/database.sqlite
