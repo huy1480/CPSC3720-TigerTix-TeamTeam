@@ -22,4 +22,16 @@ router.get('/api/events', clientController.getEvents);
  */
 router.post('/api/events/:id/purchase', clientController.purchaseTicket);
 
+/**
+ * POST /api/llm/parse
+ * Parse natural-language input describing booking intent
+ */
+router.post('/api/llm/parse', clientController.parseLLMRequest);
+
+/**
+ * POST /api/bookings/confirm
+ * Finalize a booking after explicit confirmation
+ */
+router.post('/api/bookings/confirm', clientController.confirmBooking);
+
 module.exports = router;
