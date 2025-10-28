@@ -2,7 +2,6 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "openai": "^4.77.0",
     "rebuild": "^0.1.2",
     "sqlite3": "^5.1.7"
   }

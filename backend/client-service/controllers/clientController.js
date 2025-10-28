@@ -1,6 +1,6 @@
 /**
  * Client Controller
- * Handles event retrieval and ticket purchasing logic for users
+ * Handles event retrieval and ticket booking logic for users
  */
 
 const clientModel = require('../models/clientModel');
@@ -8,21 +8,12 @@ const llmService = require('../services/llmService');
 
 /**
  * Get all events
- * Purpose: Handle GET request to fetch all available events
- * Response: 200 with events list, or 500 with error details
- * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 exports.getEvents = async (req, res) => {
   try {
-    // Retrieve all events from the database
     const events = await clientModel.getAllEvents();
-
-    // Return events as JSON response
     res.status(200).json(events);
   } catch (error) {
-    // Return 500 error if fetching fails
     res.status(500).json({
       error: 'Failed to fetch events',
       details: error.message
@@ -32,23 +23,14 @@ exports.getEvents = async (req, res) => {
 
 /**
  * Purchase a ticket
- * Purpose: Handle POST request to process ticket purchase for an event
- * Expected input: req.params.id - ID of the event to purchase a ticket for
- * Response: 200 with updated ticket info, or 4xx/500 with error details
- * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 exports.purchaseTicket = async (req, res) => {
   const eventId = req.params.id;
-  try {
-    // Attempt to purchase a ticket for the given event ID
-    const result = await clientModel.purchaseTicket(eventId);
 
-    // Return purchase result as JSON response
+  try {
+    const result = await clientModel.purchaseTicket(eventId);
     res.status(200).json(result);
   } catch (error) {
-    // Return error status and message if purchase fails
     const status = error.status || 500;
     res.status(status).json({
       error: error.message || 'Failed to process purchase'
@@ -57,10 +39,7 @@ exports.purchaseTicket = async (req, res) => {
 };
 
 /**
- * Parse a natural language request using the LLM pipeline with keyword fallback
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
+ * Parse natural-language request
  */
 exports.parseLLMRequest = async (req, res) => {
   const { text } = req.body;
@@ -73,48 +52,71 @@ exports.parseLLMRequest = async (req, res) => {
     const events = await clientModel.getAllEvents();
     const structured = await llmService.parseUserInput(text, events);
 
-    if (structured.intent === 'show_events') {
-      structured.events = events;
-      structured.message =
-        structured.message ||
-        'Here are the current events with tickets available.';
+    console.log("🔍 Parsed LLM:", structured);
 
-        //structured.eventsList = events.map(e => `${e.name} - $${e.price}`);
-
+    // ✅ Always expose focusEvent if one is matched
+    if (structured.event) {
+      structured.focusEvent = structured.event;
     }
 
+    // ✅ Fix: if event detected but LLM mislabeled intent as greet → show event details
+    if (structured.event && structured.intent === 'greet') {
+      structured.intent = 'show_events';
+    }
+
+    // ✅ Show events logic (single or list)
+    if (structured.intent === 'show_events') {
+
+      structured.events = events; // ✅ never remove event list
+
+      if (structured.focusEvent) {
+        structured.message =
+          structured.message ||
+          `${structured.focusEvent.name} is on ${structured.focusEvent.date} and has ${structured.focusEvent.tickets} tickets remaining.`;
+      } else {
+        structured.message =
+          structured.message ||
+          'Here are the current events with tickets available.';
+      }
+    }
+
+    // ✅ Greeting fallback
     if (structured.intent === 'greet') {
       structured.message =
         structured.message ||
-        'Hi there! I can list events and help prepare a ticket booking for you.';
+        'Hey! I can list events or help you book tickets.';
     }
 
+    // ✅ Booking flow
     if (structured.intent === 'book') {
       if (structured.event) {
         structured.message =
           structured.message ||
           `I found ${structured.event.name}. I can prepare ${structured.tickets} ticket(s). Should I confirm the booking?`;
-        structured.needsConfirmation =
-          Boolean(structured.needsConfirmation) && Boolean(structured.eventId);
+        structured.needsConfirmation = Boolean(structured.eventId);
       } else if (structured.rawEventName) {
-        structured.message = `I could not find an event named "${structured.rawEventName}". Try asking for "Show events" to see what's available.`;
+        structured.message =
+          `I couldn't find "${structured.rawEventName}". Try "Show events" for available ones.`;
         structured.needsConfirmation = false;
       } else {
-        structured.message = 'Which event would you like to book tickets for?';
+        structured.message =
+          'Which event would you like to book tickets for?';
         structured.needsConfirmation = false;
       }
     }
 
+    // ✅ Confirm booking
     if (structured.intent === 'confirm') {
       structured.message =
         structured.message ||
-        'Please click the confirm button to finalize your booking.';
+        'Please click confirm to finalize your booking.';
     }
 
+    // ✅ Cancel
     if (structured.intent === 'cancel') {
       structured.message =
         structured.message ||
-        'Okay, I will cancel that booking request.';
+        'Okay! I’ll cancel that request.';
     }
 
     res.status(200).json(structured);
@@ -127,10 +129,7 @@ exports.parseLLMRequest = async (req, res) => {
 };
 
 /**
- * Confirm a booking after the user has explicitly approved it
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
+ * Confirm booking
  */
 exports.confirmBooking = async (req, res) => {
   const { eventId, tickets, customerName } = req.body || {};

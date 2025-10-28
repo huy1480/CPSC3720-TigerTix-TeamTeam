@@ -1,3 +1,7 @@
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+
 const numberWords = {
   one: 1,
   two: 2,
@@ -13,255 +17,178 @@ const numberWords = {
   twelve: 12
 };
 
-let OpenAI;
-try {
-  OpenAI = require('openai');
-} catch (err) {
-  OpenAI = null;
-}
-
-const llmClient =
-  OpenAI && process.env.OPENAI_API_KEY
-    ? new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      })
-    : null;
-
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+// Default Ollama settings
+const OLLAMA_HOST = process.env.OLLAMA_HOST?.trim() || 'http://127.0.0.1:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL?.trim() || 'llama3:latest';
 
 /**
- * Attempt to parse the user's request using a configured LLM.
- * Returns null when the model is not available or parsing fails.
- *
- * @param {string} text - Raw user message
- * @param {Array<Object>} events - Known events for grounding
- * @returns {Promise<Object|null>}
+ * Send JSON POST request to Ollama
  */
-async function tryLLMParse(text, events) {
-  if (!llmClient) return null;
-
-  const eventNames = events.map((event) => event.name).join(', ') || 'No events available';
-  const systemPrompt = [
-    'You are an assistant that extracts ticket booking intents.',
-    'Only respond with strict JSON matching this schema:',
-    '{"intent":"book|show_events|greet|confirm|cancel|unknown","eventName":string|null,"tickets":number|null,"needsConfirmation":boolean}',
-    'intent is "book" when the user wants to purchase tickets, "show_events" to list events, "greet" for greetings,',
-    '"confirm" when the user is approving a booking, "cancel" when they retract, otherwise "unknown".',
-    `Here are the events you can reference: ${eventNames}.`,
-    'tickets should be an integer if provided, otherwise null.',
-    'needsConfirmation should be true only when the user is asking to book or confirm a booking.'
-  ].join(' ');
-
-  try {
-    const completion = await llmClient.chat.completions.create({
-      model: DEFAULT_MODEL,
-      temperature: 0,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: text }
-      ]
-    });
-
-    const raw = completion?.choices?.[0]?.message?.content?.trim();
-    if (!raw) return null;
-
-    const parsed = safeJsonParse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-
-    return {
-      ...parsed,
-      source: 'llm'
-    };
-  } catch (err) {
-    console.warn('LLM parsing failed, falling back to keyword parser:', err.message);
-    return null;
-  }
-}
-
-/**
- * Fallback keyword-based parser for common commands.
- *
- * @param {string} rawText - Raw user message
- * @param {Array<Object>} events - Known events
- * @returns {Object|null}
- */
-function keywordFallback(rawText, events) {
-  const text = rawText.trim().toLowerCase();
-  if (!text) return null;
-
-  if (/^(hi|hello|hey|howdy)\b/.test(text)) {
-    return {
-      intent: 'greet',
-      needsConfirmation: false,
-      source: 'fallback'
-    };
-  }
-
-  if (/(show|list|available).*(events|tickets)/.test(text) || /events\??$/.test(text)) {
-    return {
-      intent: 'show_events',
-      needsConfirmation: false,
-      source: 'fallback'
-    };
-  }
-
-  if (/^(yes|confirm|sure|please do|go ahead)\b/.test(text)) {
-    return {
-      intent: 'confirm',
-      needsConfirmation: false,
-      source: 'fallback'
-    };
-  }
-
-  if (/^(no|cancel|stop|never mind)/.test(text)) {
-    return {
-      intent: 'cancel',
-      needsConfirmation: false,
-      source: 'fallback'
-    };
-  }
-
-  const bookRegex = /(book|reserve|buy|purchase).*/;
-  if (bookRegex.test(text)) {
-    const quantity = extractQuantity(text);
-    const eventMatch = matchEventFromText(text, events);
-
-    return {
-      intent: 'book',
-      eventName: eventMatch ? eventMatch.name : null,
-      eventId: eventMatch ? eventMatch.id : null,
-      tickets: quantity || 1,
-      needsConfirmation: true,
-      source: 'fallback'
-    };
-  }
-
-  return null;
-}
-
-/**
- * Extract ticket quantity from text by checking digits and number words.
- *
- * @param {string} text - Lowercase input text
- * @returns {number|null}
- */
-function extractQuantity(text) {
-  const digitMatch = text.match(/(\d+)\s*(tickets|seats)?/);
-  if (digitMatch) {
-    const value = Number(digitMatch[1]);
-    if (!Number.isNaN(value) && value > 0) return value;
-  }
-
-  const words = Object.keys(numberWords);
-  for (const word of words) {
-    const regex = new RegExp(`\\b${word}\\b`);
-    if (regex.test(text)) {
-      return numberWords[word];
+function postJson(endpoint, payload) {
+  return new Promise((resolve, reject) => {
+    let target;
+    try {
+      target = new URL(endpoint, OLLAMA_HOST);
+    } catch (error) {
+      return reject(new Error(`Invalid Ollama host: ${error.message}`));
     }
-  }
 
-  return null;
-}
+    const data = JSON.stringify(payload);
+    const isSecure = target.protocol === 'https:';
+    const transport = isSecure ? https : http;
 
-/**
- * Attempt to match an event by name within the supplied text.
- *
- * @param {string} text - Lowercase user text
- * @param {Array<Object>} events - Known events
- * @returns {Object|null}
- */
-function matchEventFromText(text, events) {
-  if (!events || events.length === 0) return null;
+    const request = transport.request(
+      {
+        hostname: target.hostname,
+        port: target.port || (isSecure ? 443 : 80),
+        path: `${target.pathname}${target.search}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(data)
+        },
+        timeout: 15000
+      },
+      (response) => {
+        let body = '';
+        response.setEncoding('utf8');
 
-  // Exact matches take priority
-  const exact = events.find((event) => text.includes(event.nameLower));
-  if (exact) return exact.original;
+        response.on('data', (chunk) => (body += chunk));
 
-  // Try to parse the trailing portion after "for" or "to"
-  const eventPhraseMatch = text.match(/(?:for|to|at)\s+(.+)/);
-  if (eventPhraseMatch) {
-    const candidate = eventPhraseMatch[1].trim();
-    const normalized = candidate.replace(/tickets?|seats?|please|thanks?/g, '').trim();
-    if (normalized) {
-      const fuzzy = events.find((event) => event.nameLower.includes(normalized) || normalized.includes(event.nameLower));
-      if (fuzzy) return fuzzy.original;
-    }
-  }
+        response.on('end', () => {
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            return reject(
+              new Error(`Ollama status ${response.statusCode}: ${body}`)
+            );
+          }
+          try {
+            resolve(JSON.parse(body));
+          } catch (err) {
+            reject(new Error(`Bad JSON from Ollama: ${err.message}`));
+          }
+        });
+      }
+    );
 
-  // Fallback to widest fuzzy match
-  const fuzzy = events.find((event) => {
-    const words = event.nameLower.split(/\s+/);
-    return words.some((word) => word.length > 3 && text.includes(word));
+    request.on('error', reject);
+    request.write(data);
+    request.end();
   });
-
-  return fuzzy ? fuzzy.original : null;
 }
 
 /**
- * Ensure payload fields align with known events and include metadata.
- *
- * @param {Object} payload - Structured response from LLM or fallback
- * @param {Array<Object>} events - Known events with lower-case helper fields
- * @param {string} source - Source identifier (llm|fallback)
- * @returns {Object}
+ * System prompt builder
  */
-function normalizePayload(payload, events, source) {
-  const result = {
-    intent: payload.intent || 'unknown',
-    source,
-    needsConfirmation: Boolean(payload.needsConfirmation),
-    rawEventName: payload.eventName || null,
-    eventName: payload.eventName || null
+function buildSystemPrompt(events = []) {
+  const eventSummary =
+    events.length === 0
+      ? 'No events are currently available.'
+      : events
+          .map(
+            (event) =>
+              `"${event.name}" on ${event.date} with ${event.tickets} tickets remaining`
+          )
+          .join('; ');
+
+  return `
+You are the TigerTix booking parser. Interpret user requests about campus events and tickets.
+Respond STRICTLY with JSON matching this schema:
+{"intent":"book|show_events|greet|confirm|cancel|unknown","eventName":string|null,"eventId":number|null,"tickets":number|null,"needsConfirmation":boolean}.
+No markdown. No extra conversation. Only valid JSON.
+Known events: ${eventSummary}
+  `.trim();
+}
+
+/**
+ * Ask Ollama to parse the input
+ */
+async function callOllama(text, events) {
+  const systemPrompt = buildSystemPrompt(events);
+
+  const payload = {
+    model: OLLAMA_MODEL,
+    prompt: `${systemPrompt}\n\nUser: ${text}\nAssistant:`,
+    format: 'json',
+    stream: false
   };
 
-  if (payload.tickets != null) {
-    const parsedTickets = Number(payload.tickets);
-    if (!Number.isNaN(parsedTickets) && parsedTickets > 0) {
-      result.tickets = Math.floor(parsedTickets);
-    }
+  const response = await postJson('/api/generate', payload);
+
+  if (!response?.response) {
+    throw new Error('Unexpected Ollama format — missing response.response');
   }
 
-  if (result.intent === 'book') {
-    result.needsConfirmation = true;
+  const raw = response.response.trim();
+  console.log("🔍 RAW MODEL OUTPUT:", raw);
+
+  const parsed = safeJsonParse(raw);
+  if (!parsed) {
+    throw new Error('Model did not return valid JSON.');
   }
 
-  if (result.intent === 'show_events') {
-    result.events = events.map((event) => event.original);
+  return parsed;
+}
+
+/**
+ * Convert settings to internal payload
+ */
+function coerceTicketCount(value) {
+  if (value == null) return undefined;
+  const numeric = Number(value);
+  if (!Number.isNaN(numeric) && numeric > 0) return Math.floor(numeric);
+  if (typeof value === 'string') {
+    const cleaned = value.trim().toLowerCase();
+    return numberWords[cleaned];
+  }
+  return undefined;
+}
+
+/**
+ * Try to match model event to real one
+ */
+function resolveEvent(eventName, normalizedEvents) {
+  if (!eventName) return null;
+  const cleaned = eventName.trim().toLowerCase();
+  if (!cleaned) return null;
+
+  return (
+    normalizedEvents.find((e) => e.nameLower === cleaned) ||
+    normalizedEvents.find(
+      (e) => e.nameLower.includes(cleaned) || cleaned.includes(e.nameLower)
+    ) ||
+    null
+  );
+}
+
+/**
+ * Convert model JSON into your standard TigerTix structure
+ */
+function normalizePayload(payload, normalizedEvents) {
+  const intent = (payload.intent || '').toLowerCase().trim();
+  const result = {
+    intent: intent || 'unknown',
+    source: 'ollama',
+    rawEventName: payload.eventName || null,
+    eventName: payload.eventName || null,
+    needsConfirmation: Boolean(payload.needsConfirmation)
+  };
+
+  const tickets = coerceTicketCount(payload.tickets);
+  if (tickets) result.tickets = tickets;
+  if (intent === 'book') result.needsConfirmation = true;
+
+  const match = resolveEvent(payload.eventName, normalizedEvents);
+  if (match) {
+    result.event = match.original;
+    result.eventId = match.original.id;
+    result.eventName = match.original.name;
   }
 
-  if (payload.intent === 'book' && payload.eventId) {
-    const matched = events.find((event) => event.original.id === payload.eventId);
-    if (matched) {
-      result.event = matched.original;
-      result.eventId = matched.original.id;
-      result.eventName = matched.original.name;
-    }
+  if (intent === 'show_events') {
+    result.events = normalizedEvents.map((e) => e.original);
   }
 
-  if (payload.intent === 'book' && !result.event) {
-    const eventNameLower = (payload.eventName || '').toLowerCase();
-    if (eventNameLower) {
-      const match = events.find((event) => event.nameLower === eventNameLower);
-      if (match) {
-        result.event = match.original;
-        result.eventId = match.original.id;
-        result.eventName = match.original.name;
-      }
-    }
-
-    if (!result.event && eventNameLower) {
-      const fuzzy = events.find(
-        (event) => event.nameLower.includes(eventNameLower) || eventNameLower.includes(event.nameLower)
-      );
-      if (fuzzy) {
-        result.event = fuzzy.original;
-        result.eventId = fuzzy.original.id;
-        result.eventName = fuzzy.original.name;
-      }
-    }
-  }
-
-  if (result.intent === 'book' && !result.tickets) {
+  if (intent === 'book' && !result.tickets) {
     result.tickets = 1;
   }
 
@@ -269,35 +196,28 @@ function normalizePayload(payload, events, source) {
 }
 
 /**
- * Safe JSON parse helper for LLM output.
- *
- * @param {string} raw - LLM output
- * @returns {Object|null}
+ * JSON rescue parser
  */
 function safeJsonParse(raw) {
   try {
     return JSON.parse(raw);
-  } catch (err) {
+  } catch {
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     try {
       return JSON.parse(match[0]);
-    } catch (nestedErr) {
+    } catch {
       return null;
     }
   }
 }
 
 /**
- * High-level parser used by controllers.
- *
- * @param {string} text - User text input
- * @param {Array<Object>} events - Events fetched from the database
- * @returns {Promise<Object>}
+ * Exported high-level function
  */
 exports.parseUserInput = async (text, events = []) => {
-  if (!text || !text.trim()) {
-    throw { status: 400, message: 'User text is required for parsing' };
+  if (!text?.trim()) {
+    throw { status: 400, message: 'User text required' };
   }
 
   const normalizedEvents = events.map((event) => ({
@@ -305,18 +225,15 @@ exports.parseUserInput = async (text, events = []) => {
     nameLower: event.name.toLowerCase()
   }));
 
-  const llmResult = await tryLLMParse(text, normalizedEvents);
-  if (llmResult) {
-    return normalizePayload(llmResult, normalizedEvents, 'llm');
+  try {
+    const llmPayload = await callOllama(text, events);
+    return normalizePayload(llmPayload, normalizedEvents);
+  } catch (err) {
+    console.error("🛑 LLM ERROR:", err);
+    throw {
+      status: 503,
+      message: 'Failed to parse request with the Ollama model.',
+      details: err.message
+    };
   }
-
-  const fallbackResult = keywordFallback(text, normalizedEvents);
-  if (fallbackResult) {
-    return normalizePayload(fallbackResult, normalizedEvents, 'fallback');
-  }
-
-  throw {
-    status: 422,
-    message: 'Sorry, I was not able to understand that request.'
-  };
 };
