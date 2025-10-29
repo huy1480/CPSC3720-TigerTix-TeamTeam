@@ -7,7 +7,7 @@ const clientModel = require('../models/clientModel');
 const llmService = require('../services/llmService');
 
 /**
- * Get all events
+ * GET - Retrieve all events
  */
 exports.getEvents = async (req, res) => {
   try {
@@ -22,11 +22,54 @@ exports.getEvents = async (req, res) => {
 };
 
 /**
- * Purchase a ticket
+ * ✅ NEW: GET - Find event by name (search)
+ */
+exports.getEventByName = async (req, res) => {
+  try {
+    const eventName = req.query.name;
+    const event = await clientModel.findEventByName(eventName);
+
+    if (!event) {
+      return res.status(404).json({
+        message: `No event found matching "${eventName}".`
+      });
+    }
+
+    res.status(200).json(event);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to fetch event details',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * ✅ NEW: GET - Find event by ID
+ */
+exports.getEventById = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const event = await clientModel.getEventById(eventId);
+
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found.' });
+    }
+
+    res.status(200).json(event);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to fetch event',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * POST - Purchase a ticket immediately (legacy flow)
  */
 exports.purchaseTicket = async (req, res) => {
   const eventId = req.params.id;
-
   try {
     const result = await clientModel.purchaseTicket(eventId);
     res.status(200).json(result);
@@ -39,7 +82,7 @@ exports.purchaseTicket = async (req, res) => {
 };
 
 /**
- * Parse natural-language request
+ * POST - Natural-language request
  */
 exports.parseLLMRequest = async (req, res) => {
   const { text } = req.body;
@@ -54,72 +97,83 @@ exports.parseLLMRequest = async (req, res) => {
 
     console.log("🔍 Parsed LLM:", structured);
 
-    // ✅ Always expose focusEvent if one is matched
     if (structured.event) {
       structured.focusEvent = structured.event;
     }
 
-    // ✅ Fix: if event detected but LLM mislabeled intent as greet → show event details
-    if (structured.event && structured.intent === 'greet') {
-      structured.intent = 'show_events';
-    }
-
-    // ✅ Show events logic (single or list)
-    if (structured.intent === 'show_events') {
-
-      structured.events = events; // ✅ never remove event list
-
+    /**
+     * ✅ Event Details Only (NO event list)
+     */
+    if (structured.intent === 'event_details') {
       if (structured.focusEvent) {
-        structured.message =
-          structured.message ||
-          `${structured.focusEvent.name} is on ${structured.focusEvent.date} and has ${structured.focusEvent.tickets} tickets remaining.`;
+        structured.message = `${structured.event.name} is on ${structured.event.date} and has ${structured.event.tickets} tickets remaining.`;
       } else {
-        structured.message =
-          structured.message ||
-          'Here are the current events with tickets available.';
+        structured.message = `I couldn't find "${structured.rawEventName}". Try "Show events" for available ones.`;
       }
+
+      return res.status(200).json(structured);
     }
 
-    // ✅ Greeting fallback
-    if (structured.intent === 'greet') {
+    /**
+     * ✅ Show ALL events (list)
+     */
+    if (structured.intent === 'show_events') {
+      structured.events = events;
       structured.message =
         structured.message ||
-        'Hey! I can list events or help you book tickets.';
+        'Here are the current events with tickets available.';
+      return res.status(200).json(structured);
     }
 
-    // ✅ Booking flow
+    /**
+     * ✅ Greetings
+     */
+    if (structured.intent === 'greet') {
+      structured.message =
+        'Hey! I can show events or help you book tickets.';
+      return res.status(200).json(structured);
+    }
+
+    /**
+     * ✅ Booking Flow
+     */
     if (structured.intent === 'book') {
       if (structured.event) {
         structured.message =
           structured.message ||
           `I found ${structured.event.name}. I can prepare ${structured.tickets} ticket(s). Should I confirm the booking?`;
         structured.needsConfirmation = Boolean(structured.eventId);
-      } else if (structured.rawEventName) {
-        structured.message =
-          `I couldn't find "${structured.rawEventName}". Try "Show events" for available ones.`;
-        structured.needsConfirmation = false;
       } else {
-        structured.message =
-          'Which event would you like to book tickets for?';
+        structured.message = `I couldn't find "${structured.rawEventName}". Try "Show events" to browse.`;
         structured.needsConfirmation = false;
       }
+      return res.status(200).json(structured);
     }
 
-    // ✅ Confirm booking
+    /**
+     * ✅ Confirm Booking Prompt
+     */
     if (structured.intent === 'confirm') {
       structured.message =
-        structured.message ||
         'Please click confirm to finalize your booking.';
+      return res.status(200).json(structured);
     }
 
-    // ✅ Cancel
+    /**
+     * ✅ Cancel Booking
+     */
     if (structured.intent === 'cancel') {
-      structured.message =
-        structured.message ||
-        'Okay! I’ll cancel that request.';
+      structured.message = 'Okay! I’ll cancel that request.';
+      return res.status(200).json(structured);
     }
 
+    /**
+     * ✅ Everything else → unknown
+     */
+    structured.message =
+      structured.message || "I didn't understand that. Try asking about events.";
     res.status(200).json(structured);
+
   } catch (error) {
     const status = error.status || 500;
     res.status(status).json({
@@ -129,7 +183,7 @@ exports.parseLLMRequest = async (req, res) => {
 };
 
 /**
- * Confirm booking
+ * POST - Confirm Booking
  */
 exports.confirmBooking = async (req, res) => {
   const { eventId, tickets, customerName } = req.body || {};
@@ -137,7 +191,7 @@ exports.confirmBooking = async (req, res) => {
   if (eventId == null || tickets == null) {
     return res
       .status(400)
-      .json({ error: 'eventId and tickets are required to confirm a booking' });
+      .json({ error: 'eventId and tickets are required to confirm' });
   }
 
   try {

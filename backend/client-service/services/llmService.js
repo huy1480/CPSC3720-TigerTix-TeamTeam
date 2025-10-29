@@ -93,8 +93,17 @@ function buildSystemPrompt(events = []) {
   return `
 You are the TigerTix booking parser. Interpret user requests about campus events and tickets.
 Respond STRICTLY with JSON matching this schema:
-{"intent":"book|show_events|greet|confirm|cancel|unknown","eventName":string|null,"eventId":number|null,"tickets":number|null,"needsConfirmation":boolean}.
-No markdown. No extra conversation. Only valid JSON.
+{"intent":"book|show_events|event_details|greet|confirm|cancel|unknown","eventName":string|null,"eventId":number|null,"tickets":number|null,"needsConfirmation":boolean}
+
+Intent meanings:
+- book: user requests to buy tickets
+- show_events: user asks to see a full list of events
+- event_details: user requests info about a specific event (time, tickets, location, etc.)
+- greet: greeting only
+- confirm: user is confirming a booking
+- cancel: user cancels the booking process
+- unknown: anything unclear
+
 Known events: ${eventSummary}
   `.trim();
 }
@@ -165,6 +174,7 @@ function resolveEvent(eventName, normalizedEvents) {
  */
 function normalizePayload(payload, normalizedEvents) {
   const intent = (payload.intent || '').toLowerCase().trim();
+
   const result = {
     intent: intent || 'unknown',
     source: 'ollama',
@@ -175,7 +185,7 @@ function normalizePayload(payload, normalizedEvents) {
 
   const tickets = coerceTicketCount(payload.tickets);
   if (tickets) result.tickets = tickets;
-  if (intent === 'book') result.needsConfirmation = true;
+  if (intent === 'book' && !result.tickets) result.tickets = 1;
 
   const match = resolveEvent(payload.eventName, normalizedEvents);
   if (match) {
@@ -184,12 +194,19 @@ function normalizePayload(payload, normalizedEvents) {
     result.eventName = match.original.name;
   }
 
+  // ✅ show_events: return full list
   if (intent === 'show_events') {
     result.events = normalizedEvents.map((e) => e.original);
   }
 
-  if (intent === 'book' && !result.tickets) {
-    result.tickets = 1;
+  // ✅ event_details: return a single event — no full list
+  if (intent === 'event_details') {
+    if (match) {
+      delete result.events;
+      result.event = match.original;
+    } else {
+      result.message = `I couldn't find an event named "${result.rawEventName}".`;
+    }
   }
 
   return result;

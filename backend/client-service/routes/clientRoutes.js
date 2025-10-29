@@ -15,6 +15,18 @@ const clientController = require('../controllers/clientController');
 router.get('/api/events', clientController.getEvents);
 
 /**
+ * ✅ NEW — Get specific event by name (search)
+ * Example: /api/events/search?name=Jazz%20Night
+ */
+router.get('/api/events/search', clientController.getEventByName);
+
+/**
+ * ✅ NEW — Get specific event by ID
+ * Example: /api/events/3
+ */
+router.get('/api/events/:id', clientController.getEventById);
+
+/**
  * POST /api/events/:id/purchase
  * Purchase a ticket for a specific event
  * Params: id (event ID)
