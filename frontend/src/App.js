@@ -46,7 +46,9 @@ function App() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventsError, setEventsError] = useState('');
   const [bannerMessage, setBannerMessage] = useState('');
+  const [micCountdown, setMicCountdown] = useState(0);
   const chatContainerRef = useRef(null);
+  const micTimerRef = useRef(null);
 
   const appendMessage = useCallback((role, text) => {
     setChatMessages((prev) => [...prev, createMessage(role, text)]);
@@ -197,6 +199,15 @@ function App() {
     });
   }, [chatMessages, pendingBooking, assistantBusy]);
 
+  useEffect(() => {
+    return () => {
+      if (micTimerRef.current) {
+        clearInterval(micTimerRef.current);
+        micTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const confirmBooking = async () => {
     if (!pendingBooking || assistantBusy) return;
 
@@ -278,12 +289,25 @@ function App() {
   };
 
   const handleMicrophoneClick = () => {
-    const mySound = new Audio(beepSound);
-    mySound.play();
+    if (micCountdown > 0) return;
 
+    setMicCountdown(3);
+    if (micTimerRef.current) {
+      clearInterval(micTimerRef.current);
+    }
 
-    // recording logic
-
+    micTimerRef.current = setInterval(() => {
+      setMicCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(micTimerRef.current);
+          micTimerRef.current = null;
+          const mySound = new Audio(beepSound);
+          mySound.play();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleSubmit = (event) => {
@@ -444,10 +468,22 @@ function App() {
                 type="button"
                 className="mic-button"
                 onClick={handleMicrophoneClick}
-                aria-label="Start voice input"
+                aria-label={
+                  micCountdown > 0
+                    ? `Voice input begins in ${micCountdown} second${
+                        micCountdown === 1 ? '' : 's'
+                      }`
+                    : 'Start voice input'
+                }
                 disabled={assistantBusy}
               >
-                <img src={microphoneIcon} alt="" aria-hidden="true" />
+                {micCountdown > 0 ? (
+                  <span className="mic-countdown" aria-hidden="true">
+                    {micCountdown}
+                  </span>
+                ) : (
+                  <img src={microphoneIcon} alt="" aria-hidden="true" />
+                )}
               </button>
               <button
                 type="submit"

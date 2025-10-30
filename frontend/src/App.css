@@ -333,6 +333,12 @@ main[role='main'] {
   height: 20px;
 }
 
+.chat-input .mic-countdown {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #522d80;
+}
+
 .chat-input .mic-button:hover:not(:disabled) {
   background-color: #f4f0ff;
 }
