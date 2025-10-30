@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import microphoneIcon from './microphone.png';
+import beepSound from './Beep.mp3';
 
 const createMessage = (role, text) => ({
   id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -277,7 +278,12 @@ function App() {
   };
 
   const handleMicrophoneClick = () => {
-    console.log('Microphone button clicked');
+    const mySound = new Audio(beepSound);
+    mySound.play();
+
+
+    // recording logic
+
   };
 
   const handleSubmit = (event) => {
