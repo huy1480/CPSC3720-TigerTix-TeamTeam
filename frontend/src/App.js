@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
+import microphoneIcon from './microphone.png';
 
 const createMessage = (role, text) => ({
   id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -275,6 +276,10 @@ function App() {
     appendMessage('assistant', 'Okay, I will keep those tickets available.');
   };
 
+  const handleMicrophoneClick = () => {
+    console.log('Microphone button clicked');
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
     sendChatMessage();
@@ -429,7 +434,20 @@ function App() {
                 disabled={assistantBusy}
                 autoComplete="off"
               />
-              <button type="submit" disabled={assistantBusy}>
+              <button
+                type="button"
+                className="mic-button"
+                onClick={handleMicrophoneClick}
+                aria-label="Start voice input"
+                disabled={assistantBusy}
+              >
+                <img src={microphoneIcon} alt="" aria-hidden="true" />
+              </button>
+              <button
+                type="submit"
+                className="send-button"
+                disabled={assistantBusy}
+              >
                 Send
               </button>
             </form>

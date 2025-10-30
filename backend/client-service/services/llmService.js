@@ -246,7 +246,7 @@ exports.parseUserInput = async (text, events = []) => {
     const llmPayload = await callOllama(text, events);
     return normalizePayload(llmPayload, normalizedEvents);
   } catch (err) {
-    console.error("🛑 LLM ERROR:", err);
+    console.error("LLM ERROR:", err);
     throw {
       status: 503,
       message: 'Failed to parse request with the Ollama model.',

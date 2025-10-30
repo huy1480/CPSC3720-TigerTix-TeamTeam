@@ -289,7 +289,7 @@ main[role='main'] {
   font-size: 1rem;
 }
 
-.chat-input button {
+.chat-input .send-button {
   padding: 12px 20px;
   background-color: #f56600;
   color: #ffffff;
@@ -301,17 +301,49 @@ main[role='main'] {
   transition: background-color 0.2s, transform 0.1s;
 }
 
-.chat-input button:disabled {
+.chat-input .send-button:disabled {
   background-color: #f2b48b;
   cursor: not-allowed;
 }
 
-.chat-input button:hover:not(:disabled) {
+.chat-input .send-button:hover:not(:disabled) {
   background-color: #d45500;
 }
 
-.chat-input button:active:not(:disabled) {
+.chat-input .send-button:active:not(:disabled) {
   transform: scale(0.98);
+}
+
+.chat-input .mic-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #c9c3da;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.chat-input .mic-button img {
+  width: 20px;
+  height: 20px;
+}
+
+.chat-input .mic-button:hover:not(:disabled) {
+  background-color: #f4f0ff;
+}
+
+.chat-input .mic-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.chat-input .mic-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Focus styles */
