@@ -1,4 +1,4 @@
-/* Base styles */
+/* Base app layout */
 .App {
   text-align: center;
   min-height: 100vh;
@@ -6,13 +6,12 @@
   padding: 20px;
 }
 
-main[role="main"] {
+main[role='main'] {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 }
 
-/* Page title */
 #page-title {
   font-size: 2.5rem;
   color: #522d80; /* Clemson purple */
@@ -20,7 +19,7 @@ main[role="main"] {
   font-weight: bold;
 }
 
-/* Visually hidden class for screen readers only */
+/* Screen-reader only text */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -33,69 +32,106 @@ main[role="main"] {
   border-width: 0;
 }
 
-/* Message container with ARIA live region */
+/* Layout for events and assistant */
+.dashboard-layout {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.events-panel,
+.chat-panel {
+  flex: 1 1 360px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.events-panel h2 {
+  margin: 0 0 16px 0;
+  text-align: left;
+  color: #522d80;
+}
+
 .message-container {
-  min-height: 60px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .message {
-  padding: 15px 20px;
+  padding: 12px 16px;
   background-color: #d4edda;
   border: 1px solid #c3e6cb;
-  border-radius: 5px;
+  border-radius: 8px;
   color: #155724;
   font-weight: 500;
-  max-width: 600px;
+  text-align: left;
+  width: 100%;
 }
 
-/* Events list */
+.events-loading {
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+.events-error {
+  color: #b00020;
+  background-color: #fdecea;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #f5c6cb;
+  text-align: left;
+}
+
+/* Events list styles */
 .events-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-/* Individual event item */
 .event-item {
-  background: white;
+  background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .event-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
 }
 
-/* Event article container */
 .event-item article {
   padding: 20px;
   text-align: left;
 }
 
-/* Event name heading */
 .event-name {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   color: #f56600; /* Clemson orange */
-  margin: 0 0 15px 0;
+  margin: 0 0 12px 0;
   font-weight: bold;
 }
 
-/* Event details section */
 .event-details {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .event-details p {
-  margin: 10px 0;
+  margin: 8px 0;
   font-size: 1rem;
   color: #333;
 }
@@ -111,14 +147,13 @@ main[role="main"] {
   font-size: 1.1rem;
 }
 
-/* Buy ticket button */
 .buy-button {
   width: 100%;
-  padding: 12px 24px;
-  background-color: #f56600; /* Clemson orange */
-  color: white;
+  padding: 12px 20px;
+  background-color: #f56600;
+  color: #ffffff;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -139,19 +174,185 @@ main[role="main"] {
   opacity: 0.6;
 }
 
-/* CRITICAL: Focus indicators for keyboard navigation */
-.buy-button:focus {
-  outline: 3px solid #522d80;
-  outline-offset: 2px;
+.event-helper {
+  margin-top: 16px;
+  font-size: 0.95rem;
+  color: #555;
+  background-color: #f9f1ff;
+  padding: 12px;
+  border-radius: 6px;
 }
 
-/* Focus visible for better keyboard navigation */
-.buy-button:focus-visible {
-  outline: 3px solid #522d80;
-  outline-offset: 2px;
+/* Chat assistant styles */
+.chat-panel {
+  max-height: 720px;
 }
 
-/* Enhanced focus for all interactive elements */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.chat-message {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 1rem;
+  text-align: left;
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.chat-message.assistant {
+  align-self: flex-start;
+  background-color: #ffffff;
+  border: 1px solid #e0dcee;
+  color: #333;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+  background-color: #522d80;
+  color: #ffffff;
+}
+
+.assistant-status {
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  color: #666;
+  text-align: left;
+}
+
+.booking-confirmation {
+  background-color: #f4f0ff;
+  border: 1px solid #d6c8ff;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.booking-confirmation p {
+  margin: 0 0 12px 0;
+  color: #32235d;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.booking-actions button {
+  flex: 1 1 150px;
+  padding: 10px 16px;
+  background-color: #522d80;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.booking-actions button:nth-child(2) {
+  background-color: #d4d0e4;
+  color: #32235d;
+}
+
+.booking-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.booking-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.chat-input {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #c9c3da;
+  font-size: 1rem;
+}
+
+.chat-input .send-button {
+  padding: 12px 20px;
+  background-color: #f56600;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.chat-input .send-button:disabled {
+  background-color: #f2b48b;
+  cursor: not-allowed;
+}
+
+.chat-input .send-button:hover:not(:disabled) {
+  background-color: #d45500;
+}
+
+.chat-input .send-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.chat-input .mic-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #c9c3da;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.chat-input .mic-button img {
+  width: 20px;
+  height: 20px;
+}
+
+.chat-input .mic-countdown {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #522d80;
+}
+
+.chat-input .mic-button:hover:not(:disabled) {
+  background-color: #f4f0ff;
+}
+
+.chat-input .mic-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.chat-input .mic-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Focus styles */
 a:focus,
 button:focus,
 input:focus,
@@ -161,7 +362,6 @@ textarea:focus {
   outline-offset: 2px;
 }
 
-/* Remove default focus and add custom for better visibility */
 *:focus:not(:focus-visible) {
   outline: none;
 }
@@ -171,47 +371,25 @@ textarea:focus {
   outline-offset: 2px;
 }
 
-/* Loading state */
-div[role="status"] p {
-  font-size: 1.2rem;
-  color: #666;
-  padding: 20px;
-}
-
-/* Responsive design */
+/* Responsive layout */
 @media (max-width: 768px) {
   #page-title {
     font-size: 2rem;
   }
 
-  .events-list {
-    grid-template-columns: 1fr;
+  .dashboard-layout {
+    flex-direction: column;
   }
 
-  .event-name {
-    font-size: 1.3rem;
+  .chat-panel {
+    max-height: none;
   }
 }
 
-/* High contrast mode support */
+/* High contrast support */
 @media (prefers-contrast: high) {
-  .buy-button {
+  .chat-input button,
+  .booking-actions button {
     border: 2px solid black;
-  }
-  
-  .event-item {
-    border: 2px solid black;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .event-item,
-  .buy-button {
-    transition: none;
-  }
-  
-  .event-item:hover {
-    transform: none;
   }
 }

@@ -1,104 +1,373 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
+import microphoneIcon from './microphone.png';
+import beepSound from './Beep.mp3';
+
+const createMessage = (role, text) => ({
+  id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  role,
+  text
+});
+
+const formatEventListMessage = (eventList = []) => {
+  if (!eventList || eventList.length === 0) {
+    return 'There are no events available right now.';
+  }
+
+  const lines = eventList.map(
+    (event) =>
+      `- ${event.name} on ${event.date} (${event.tickets} tickets remaining)`
+  );
+
+  return ['Here are the current events with available tickets:', ...lines].join(
+    '\n'
+  );
+};
 
 /**
  * TigerTix Main Application Component
- * Displays campus events with accessible ticket purchasing interface
+ * Displays events and an LLM-assisted booking workflow
  */
 function App() {
   const [events, setEvents] = useState([]);
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [chatMessages, setChatMessages] = useState([
+    createMessage(
+      'assistant',
+      "Hi there! I'm the TigerTix assistant. I can list events and help reserve tickets for you."
+    ),
+    createMessage(
+      'assistant',
+      'Try asking me something like "Show the events" or "Book two tickets for the Spring Concert."'
+    )
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [assistantBusy, setAssistantBusy] = useState(false);
+  const [pendingBooking, setPendingBooking] = useState(null);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [eventsError, setEventsError] = useState('');
+  const [bannerMessage, setBannerMessage] = useState('');
+  const [micCountdown, setMicCountdown] = useState(0);
+  const chatContainerRef = useRef(null);
+  const micTimerRef = useRef(null);
+
+  const appendMessage = useCallback((role, text) => {
+    setChatMessages((prev) => [...prev, createMessage(role, text)]);
+  }, []);
 
   // Fetch events dynamically from the client microservice
   useEffect(() => {
-    setLoading(true);
-    fetch('http://localhost:6001/api/events')
-      .then((res) => res.json())
-      .then((data) => {
+    const fetchEvents = async () => {
+      setLoadingEvents(true);
+      try {
+        const res = await fetch('/api/events');
+        if (!res.ok) {
+          throw new Error('Unable to load events');
+        }
+        const data = await res.json();
         setEvents(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching events:', err);
-        setMessage('Failed to load events. Please try again later.');
-        setLoading(false);
-      });
-  }, []);
+        setEventsError('');
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        setEventsError('Failed to load events. Please try again later.');
+        appendMessage(
+          'assistant',
+          'I had trouble loading the events. Please refresh the page or try again later.'
+        );
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
 
-  /**
-   * Handle ticket purchase
-   * @param {number} eventId - ID of the event
-   * @param {string} eventName - Name of the event for confirmation message
-   */
-  const buyTicket = async (eventId, eventName) => {
+    fetchEvents();
+  }, [appendMessage]);
+
+  const handleParseResponse = (data) => {
+    switch (data.intent) {
+      case 'show_events': {
+        let eventList = events;
+        if (Array.isArray(data.events)) {
+          setEvents(data.events);
+          eventList = data.events;
+        }
+
+        const responseText =
+          eventList && eventList.length > 0
+            ? formatEventListMessage(eventList)
+            : data.message || 'No events available at this time.';
+
+        appendMessage('assistant', responseText);
+        setPendingBooking(null);
+        break;
+      }
+      case 'greet': {
+        appendMessage(
+          'assistant',
+          data.message ||
+            "Hello! I'm ready to help you find events or book tickets."
+        );
+        break;
+      }
+      case 'book': {
+        if (data.eventId && data.event) {
+          const quantity = data.tickets || 1;
+          setPendingBooking({
+            eventId: data.eventId,
+            eventName: data.event.name,
+            eventDate: data.event.date,
+            tickets: quantity
+          });
+          appendMessage(
+            'assistant',
+            data.message ||
+              `I can prepare ${quantity} ticket(s) for ${data.event.name}. Please confirm below when you're ready.`
+          );
+        } else {
+          appendMessage(
+            'assistant',
+            data.message ||
+              "I couldn't find that event. Ask me to show events to see what's available."
+          );
+          setPendingBooking(null);
+        }
+        break;
+      }
+      case 'cancel': {
+        setPendingBooking(null);
+        appendMessage(
+          'assistant',
+          data.message || 'No problem, I have cancelled that booking request.'
+        );
+        break;
+      }
+      case 'confirm': {
+        appendMessage(
+          'assistant',
+          data.message ||
+            'Please use the confirm button to finalize your booking.'
+        );
+        break;
+      }
+      default: {
+        appendMessage(
+          'assistant',
+          data.message ||
+            'I can list events and help you prepare a booking. Try asking to show events or request tickets.'
+        );
+        break;
+      }
+    }
+  };
+
+  const sendChatMessage = async () => {
+    const trimmed = chatInput.trim();
+    if (!trimmed || assistantBusy) return;
+
+    appendMessage('user', trimmed);
+    setChatInput('');
+    setAssistantBusy(true);
+
     try {
-      const res = await fetch(`/api/events/${eventId}/purchase`, {
+      const res = await fetch('/api/llm/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimmed })
       });
       const data = await res.json();
 
-      if (res.ok) {
-        // Update UI dynamically to reflect ticket count change
-        setEvents((prevEvents) =>
-          prevEvents.map((ev) =>
-            ev.id === eventId ? { ...ev, tickets: data.remaining } : ev
-          )
-        );
-        setMessage(`Success! Ticket purchased for ${eventName}. ${data.remaining} tickets remaining.`);
-      } else {
-        setMessage(`Error: ${data.error}`);
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to interpret that request.');
       }
+
+      handleParseResponse(data);
     } catch (error) {
-      console.error('Error purchasing ticket:', error);
-      setMessage('An error occurred while processing your purchase.');
+      console.error('Assistant error:', error);
+      appendMessage(
+        'assistant',
+        'Sorry, I had trouble with that request. Please try again or ask me to list the events.'
+      );
+    } finally {
+      setAssistantBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!chatContainerRef.current) return;
+    const node = chatContainerRef.current;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior: 'smooth'
+    });
+  }, [chatMessages, pendingBooking, assistantBusy]);
+
+  useEffect(() => {
+    return () => {
+      if (micTimerRef.current) {
+        clearInterval(micTimerRef.current);
+        micTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const confirmBooking = async () => {
+    if (!pendingBooking || assistantBusy) return;
+
+    setAssistantBusy(true);
+    try {
+      const res = await fetch('/api/bookings/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: pendingBooking.eventId,
+          tickets: pendingBooking.tickets,
+          customerName: 'Guest'
+        })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to confirm the booking.');
+      }
+
+      setEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event.id === pendingBooking.eventId
+            ? { ...event, tickets: data.remaining }
+            : event
+        )
+      );
+
+      appendMessage(
+        'assistant',
+        data.message ||
+          `All set! Your tickets for ${pendingBooking.eventName} are booked.`
+      );
+    } catch (error) {
+      console.error('Confirm booking error:', error);
+      appendMessage(
+        'assistant',
+        `I could not confirm that booking: ${error.message}.`
+      );
+    } finally {
+      setPendingBooking(null);
+      setAssistantBusy(false);
+    }
+  };
+
+  const buyTicket = async (event) => {
+    try {
+      const res = await fetch(`/api/events/${event.id}/purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to purchase a ticket.');
+      }
+
+      setEvents((prevEvents) =>
+        prevEvents.map((existing) =>
+          existing.id === event.id
+            ? { ...existing, tickets: data.remaining }
+            : existing
+        )
+      );
+
+      setBannerMessage(
+        `Success! Ticket purchased for ${event.name}. ${data.remaining} tickets remaining.`
+      );
+    } catch (error) {
+      console.error('Direct purchase error:', error);
+      setBannerMessage(error.message);
+    }
+  };
+
+  const cancelPendingBooking = () => {
+    if (!pendingBooking) return;
+    setPendingBooking(null);
+    appendMessage('assistant', 'Okay, I will keep those tickets available.');
+  };
+
+  const handleMicrophoneClick = () => {
+    if (micCountdown > 0) return;
+
+    setMicCountdown(3);
+    if (micTimerRef.current) {
+      clearInterval(micTimerRef.current);
+    }
+
+    micTimerRef.current = setInterval(() => {
+      setMicCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(micTimerRef.current);
+          micTimerRef.current = null;
+          const mySound = new Audio(beepSound);
+          mySound.play();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    sendChatMessage();
+  };
+
+  const renderMessageContent = (text) =>
+    text.split('\n').map((line, index, lines) => (
+      <span key={`${line}-${index}`}>
+        {line}
+        {index < lines.length - 1 && <br />}
+      </span>
+    ));
 
   return (
     <div className="App">
       {/* Main content area with proper semantic HTML */}
       <main role="main">
         <h1 id="page-title">Clemson Campus Events</h1>
-        
-        {/* Screen reader announcement area for dynamic messages */}
-        <div 
-          role="status" 
-          aria-live="polite" 
-          aria-atomic="true"
-          className="message-container"
-        >
-          {message && <p className="message">{message}</p>}
-        </div>
+        <section className="dashboard-layout" aria-label="Events and booking assistant">
+          <div className="events-panel">
+            <h2 id="events-heading">Available Events</h2>
+            {bannerMessage && (
+              <div
+                className="message-container"
+                role="status"
+                aria-live="polite"
+              >
+                <p className="message">{bannerMessage}</p>
+              </div>
+            )}
 
-        {/* Loading state with appropriate ARIA */}
-        {loading ? (
-          <div role="status" aria-live="polite">
-            <p>Loading events...</p>
-          </div>
-        ) : (
-          <section aria-labelledby="events-heading">
-            <h2 id="events-heading" className="visually-hidden">Available Events List</h2>
-            
-            {events.length === 0 ? (
+            {/* Loading state with appropriate ARIA */}
+            {loadingEvents ? (
+              <div role="status" aria-live="polite" className="events-loading">
+                <p>Loading events...</p>
+              </div>
+            ) : eventsError ? (
+              <p className="events-error" role="alert">
+                {eventsError}
+              </p>
+            ) : events.length === 0 ? (
               <p>No events available at this time.</p>
             ) : (
-              <ul className="events-list" role="list">
+              <ul className="events-list" aria-labelledby="events-heading">
                 {events.map((event) => (
-                  <li key={event.id} className="event-item" role="listitem">
+                  <li key={event.id} className="event-item">
                     <article aria-labelledby={`event-name-${event.id}`}>
                       <h3 id={`event-name-${event.id}`} className="event-name">
                         {event.name}
                       </h3>
-                      
+
                       <div className="event-details">
                         <p className="event-date">
                           <span className="label">Date:</span>{' '}
                           <time dateTime={event.date}>{event.date}</time>
                         </p>
-                        
-                        <p 
+
+                        <p
                           className="event-tickets"
                           id={`tickets-${event.id}`}
                           aria-label={`${event.tickets} tickets available for ${event.name}`}
@@ -107,13 +376,14 @@ function App() {
                           <span className="ticket-count">{event.tickets}</span>
                         </p>
                       </div>
-                      
-                      <button 
-                        onClick={() => buyTicket(event.id, event.name)}
+
+                      <button
+                        type="button"
+                        className="buy-button"
+                        onClick={() => buyTicket(event)}
                         aria-label={`Purchase ticket for ${event.name}. ${event.tickets} tickets available.`}
                         aria-describedby={`tickets-${event.id}`}
                         disabled={event.tickets <= 0}
-                        className="buy-button"
                       >
                         {event.tickets > 0 ? 'Buy Ticket' : 'Sold Out'}
                       </button>
@@ -122,8 +392,109 @@ function App() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <section
+            className="chat-panel"
+            aria-label="TigerTix booking assistant"
+          >
+            <div
+              className="chat-messages"
+              role="log"
+              aria-live="polite"
+              aria-relevant="additions"
+              ref={chatContainerRef}
+            >
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className={`chat-message ${msg.role}`}>
+                  <p>{renderMessageContent(msg.text)}</p>
+                </div>
+              ))}
+            </div>
+
+            {assistantBusy && (
+              <p className="assistant-status" role="status" aria-live="polite">
+                The assistant is thinking...
+              </p>
+            )}
+
+            {pendingBooking && (
+              <div
+                className="booking-confirmation"
+                role="group"
+                aria-label="Confirm booking"
+              >
+                <p>
+                  Ready to book {pendingBooking.tickets} ticket(s) for{' '}
+                  <strong>{pendingBooking.eventName}</strong>
+                  {pendingBooking.eventDate
+                    ? ` on ${pendingBooking.eventDate}`
+                    : ''}
+                  ?
+                </p>
+                <div className="booking-actions">
+                  <button
+                    type="button"
+                    onClick={confirmBooking}
+                    disabled={assistantBusy}
+                  >
+                    Confirm Booking
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelPendingBooking}
+                    disabled={assistantBusy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form className="chat-input" onSubmit={handleSubmit}>
+              <label htmlFor="chat-text" className="visually-hidden">
+                Message the TigerTix assistant
+              </label>
+              <input
+                id="chat-text"
+                type="text"
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                placeholder="Ask about events or request a booking..."
+                disabled={assistantBusy}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="mic-button"
+                onClick={handleMicrophoneClick}
+                aria-label={
+                  micCountdown > 0
+                    ? `Voice input begins in ${micCountdown} second${
+                        micCountdown === 1 ? '' : 's'
+                      }`
+                    : 'Start voice input'
+                }
+                disabled={assistantBusy}
+              >
+                {micCountdown > 0 ? (
+                  <span className="mic-countdown" aria-hidden="true">
+                    {micCountdown}
+                  </span>
+                ) : (
+                  <img src={microphoneIcon} alt="" aria-hidden="true" />
+                )}
+              </button>
+              <button
+                type="submit"
+                className="send-button"
+                disabled={assistantBusy}
+              >
+                Send
+              </button>
+            </form>
           </section>
-        )}
+        </section>
       </main>
     </div>
   );
