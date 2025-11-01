@@ -25,8 +25,8 @@ const formatEventListMessage = (eventList = []) => {
 };
 
 /**
- * TigerTix Main Application Component
- * Displays events and an LLM-assisted booking workflow
+ * TigerTix Main Application Component with Voice-Enabled Interface
+ * Displays events and an LLM-assisted booking workflow with voice interaction
  */
 function App() {
   const [events, setEvents] = useState([]);
@@ -37,7 +37,7 @@ function App() {
     ),
     createMessage(
       'assistant',
-      'Try asking me something like "Show the events" or "Book two tickets for the Spring Concert."'
+      'Try asking me something like "Show the events" or "Book two tickets for the Spring Concert." You can also use the microphone button to speak!'
     )
   ]);
   const [chatInput, setChatInput] = useState('');
@@ -46,42 +46,67 @@ function App() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventsError, setEventsError] = useState('');
   const [bannerMessage, setBannerMessage] = useState('');
+  
+  // Voice-related state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [micCountdown, setMicCountdown] = useState(0);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  
   const chatContainerRef = useRef(null);
   const micTimerRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const synthRef = useRef(null);
 
   const appendMessage = useCallback((role, text) => {
     setChatMessages((prev) => [...prev, createMessage(role, text)]);
   }, []);
 
-  // Fetch events dynamically from the client microservice
-  useEffect(() => {
-    const fetchEvents = async () => {
-      setLoadingEvents(true);
-      try {
-        const res = await fetch('/api/events');
-        if (!res.ok) {
-          throw new Error('Unable to load events');
-        }
-        const data = await res.json();
-        setEvents(data);
-        setEventsError('');
-      } catch (error) {
-        console.error('Error fetching events:', error);
-        setEventsError('Failed to load events. Please try again later.');
-        appendMessage(
-          'assistant',
-          'I had trouble loading the events. Please refresh the page or try again later.'
-        );
-      } finally {
-        setLoadingEvents(false);
-      }
+  // Text-to-Speech function (defined early so handleVoiceInput can use it)
+  const speakText = useCallback((text) => {
+    if (!synthRef.current || !voiceSupported) {
+      console.warn('Speech synthesis not available');
+      return;
+    }
+    
+    // Cancel any ongoing speech
+    synthRef.current.cancel();
+    
+    // Create utterance
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Configure for accessibility
+    utterance.rate = 0.9; // Slightly slower for clarity
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to use a natural-sounding voice
+    const voices = synthRef.current.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.lang.startsWith('en') && voice.name.includes('Google')
+    ) || voices.find(voice => voice.lang.startsWith('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.onstart = () => {
+      setIsSpeaking(true);
     };
+    
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+    
+    utterance.onerror = (event) => {
+      console.error('Speech synthesis error:', event);
+      setIsSpeaking(false);
+    };
+    
+    synthRef.current.speak(utterance);
+  }, [voiceSupported]);
 
-    fetchEvents();
-  }, [appendMessage]);
-
-  const handleParseResponse = (data) => {
+  const handleParseResponse = useCallback((data) => {
     switch (data.intent) {
       case 'show_events': {
         let eventList = events;
@@ -156,7 +181,162 @@ function App() {
         break;
       }
     }
-  };
+  }, [events, appendMessage]);
+
+  // Handle voice input processing (defined before useEffect that uses it)
+  const handleVoiceInput = useCallback(async (transcript) => {
+    setAssistantBusy(true);
+
+    try {
+      const res = await fetch('/api/llm/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: transcript })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to interpret that request.');
+      }
+
+      handleParseResponse(data);
+      
+      // Speak the assistant's response
+      if (data.message) {
+        speakText(data.message);
+      }
+    } catch (error) {
+      console.error('Assistant error:', error);
+      const errorMsg = 'Sorry, I had trouble with that request. Please try again or ask me to list the events.';
+      appendMessage('assistant', errorMsg);
+      speakText(errorMsg);
+    } finally {
+      setAssistantBusy(false);
+    }
+  }, [speakText, appendMessage, handleParseResponse]);
+
+  // Initialize voice services (only once on mount)
+  useEffect(() => {
+    // Check for Web Speech API support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const speechSynthesis = window.speechSynthesis;
+    
+    if (SpeechRecognition && speechSynthesis) {
+      setVoiceSupported(true);
+      
+      // Only initialize if not already initialized
+      if (!recognitionRef.current) {
+        // Initialize Speech Recognition
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
+      }
+      
+      // Initialize Speech Synthesis
+      if (!synthRef.current) {
+        synthRef.current = speechSynthesis;
+      }
+    } else {
+      console.warn('Web Speech API not supported in this browser');
+    }
+    
+    // Cleanup on unmount only
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // Ignore abort errors on cleanup
+        }
+      }
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+    };
+  }, []); // Empty dependency array - run once on mount
+
+  // Setup recognition event handlers separately (updates when handlers change)
+  useEffect(() => {
+    if (!recognitionRef.current) return;
+
+    const handleResult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log('Voice recognized:', transcript);
+      
+      // Display recognized text in chat
+      appendMessage('user', transcript);
+      setChatInput('');
+      setIsRecording(false);
+      
+      // Send to LLM for processing
+      handleVoiceInput(transcript);
+    };
+
+    const handleError = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      
+      // Don't show error for intentional aborts or network errors during reset
+      if (event.error === 'aborted') {
+        return;
+      }
+      
+      if (event.error === 'network') {
+        // Network error often happens during abort/restart - don't show message
+        console.log('Network error (likely during reset), ignoring');
+        return;
+      }
+      
+      let errorMessage = 'Sorry, I had trouble understanding that.';
+      if (event.error === 'no-speech') {
+        errorMessage = 'No speech was detected. Please try again.';
+      } else if (event.error === 'not-allowed') {
+        errorMessage = 'Microphone access was denied. Please enable it in your browser settings.';
+      }
+      
+      appendMessage('assistant', errorMessage);
+    };
+
+    const handleEnd = () => {
+      console.log('Recognition ended');
+      setIsRecording(false);
+    };
+
+    // Attach handlers
+    recognitionRef.current.onresult = handleResult;
+    recognitionRef.current.onerror = handleError;
+    recognitionRef.current.onend = handleEnd;
+
+    // No cleanup needed here - handlers are just being reassigned
+  }, [appendMessage, handleVoiceInput]); // Update handlers when these change
+
+  // Fetch events dynamically from the client microservice
+  useEffect(() => {
+    const fetchEvents = async () => {
+      setLoadingEvents(true);
+      try {
+        const res = await fetch('/api/events');
+        if (!res.ok) {
+          throw new Error('Unable to load events');
+        }
+        const data = await res.json();
+        setEvents(data);
+        setEventsError('');
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        setEventsError('Failed to load events. Please try again later.');
+        appendMessage(
+          'assistant',
+          'I had trouble loading the events. Please refresh the page or try again later.'
+        );
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+
+    fetchEvents();
+  }, [appendMessage]);
 
   const sendChatMessage = async () => {
     const trimmed = chatInput.trim();
@@ -179,12 +359,16 @@ function App() {
       }
 
       handleParseResponse(data);
+      
+      // Optionally speak the response for text input too
+      if (data.message) {
+        speakText(data.message);
+      }
     } catch (error) {
       console.error('Assistant error:', error);
-      appendMessage(
-        'assistant',
-        'Sorry, I had trouble with that request. Please try again or ask me to list the events.'
-      );
+      const errorMsg = 'Sorry, I had trouble with that request. Please try again or ask me to list the events.';
+      appendMessage('assistant', errorMsg);
+      speakText(errorMsg);
     } finally {
       setAssistantBusy(false);
     }
@@ -236,17 +420,14 @@ function App() {
         )
       );
 
-      appendMessage(
-        'assistant',
-        data.message ||
-          `All set! Your tickets for ${pendingBooking.eventName} are booked.`
-      );
+      const successMsg = data.message || `All set! Your tickets for ${pendingBooking.eventName} are booked.`;
+      appendMessage('assistant', successMsg);
+      speakText(successMsg);
     } catch (error) {
       console.error('Confirm booking error:', error);
-      appendMessage(
-        'assistant',
-        `I could not confirm that booking: ${error.message}.`
-      );
+      const errorMsg = `I could not confirm that booking: ${error.message}.`;
+      appendMessage('assistant', errorMsg);
+      speakText(errorMsg);
     } finally {
       setPendingBooking(null);
       setAssistantBusy(false);
@@ -285,12 +466,19 @@ function App() {
   const cancelPendingBooking = () => {
     if (!pendingBooking) return;
     setPendingBooking(null);
-    appendMessage('assistant', 'Okay, I will keep those tickets available.');
+    const cancelMsg = 'Okay, I will keep those tickets available.';
+    appendMessage('assistant', cancelMsg);
+    speakText(cancelMsg);
   };
 
   const handleMicrophoneClick = () => {
-    if (micCountdown > 0) return;
+    if (micCountdown > 0 || isRecording || !voiceSupported) return;
 
+    // Play beep sound first
+    const audio = new Audio(beepSound);
+    audio.play().catch(err => console.error('Beep sound error:', err));
+
+    // Start countdown
     setMicCountdown(3);
     if (micTimerRef.current) {
       clearInterval(micTimerRef.current);
@@ -301,13 +489,63 @@ function App() {
         if (prev <= 1) {
           clearInterval(micTimerRef.current);
           micTimerRef.current = null;
-          const mySound = new Audio(beepSound);
-          mySound.play();
+          
+          // Start recording after countdown
+          setTimeout(() => {
+            startRecording();
+          }, 100);
+          
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const startRecording = () => {
+    if (!recognitionRef.current || !voiceSupported) {
+      appendMessage('assistant', 'Voice input is not supported in your browser.');
+      return;
+    }
+
+    // Check if already recording
+    if (isRecording) {
+      console.log('Recognition already running, skipping start');
+      return;
+    }
+
+    try {
+      recognitionRef.current.start();
+      setIsRecording(true);
+      // Only show message after successful start
+      appendMessage('assistant', 'Listening... Please speak now.');
+    } catch (error) {
+      console.error('Error starting recognition:', error);
+      
+      // If already started, just mark as recording and show message
+      if (error.message && error.message.includes('already started')) {
+        console.log('Recognition was already active, marking as recording');
+        setIsRecording(true);
+        appendMessage('assistant', 'Listening... Please speak now.');
+      } else {
+        setIsRecording(false);
+        appendMessage('assistant', 'Could not start voice recognition. Please try again.');
+      }
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    }
   };
 
   const handleSubmit = (event) => {
@@ -328,6 +566,13 @@ function App() {
       {/* Main content area with proper semantic HTML */}
       <main role="main">
         <h1 id="page-title">Clemson Campus Events</h1>
+        
+        {!voiceSupported && (
+          <div className="voice-warning" role="alert">
+            Voice features are not supported in your browser. Please use Chrome, Edge, or Safari for voice interaction.
+          </div>
+        )}
+        
         <section className="dashboard-layout" aria-label="Events and booking assistant">
           <div className="events-panel">
             <h2 id="events-heading">Available Events</h2>
@@ -396,7 +641,7 @@ function App() {
 
           <section
             className="chat-panel"
-            aria-label="TigerTix booking assistant"
+            aria-label="TigerTix booking assistant with voice support"
           >
             <div
               className="chat-messages"
@@ -415,6 +660,18 @@ function App() {
             {assistantBusy && (
               <p className="assistant-status" role="status" aria-live="polite">
                 The assistant is thinking...
+              </p>
+            )}
+            
+            {isRecording && (
+              <p className="recording-status" role="status" aria-live="polite">
+                🎤 Recording... Speak now
+              </p>
+            )}
+            
+            {isSpeaking && (
+              <p className="speaking-status" role="status" aria-live="polite">
+                🔊 Speaking...
               </p>
             )}
 
@@ -461,34 +718,47 @@ function App() {
                 value={chatInput}
                 onChange={(event) => setChatInput(event.target.value)}
                 placeholder="Ask about events or request a booking..."
-                disabled={assistantBusy}
+                disabled={assistantBusy || isRecording}
                 autoComplete="off"
               />
               <button
                 type="button"
-                className="mic-button"
-                onClick={handleMicrophoneClick}
+                className={`mic-button ${isRecording ? 'recording' : ''} ${!voiceSupported ? 'disabled' : ''}`}
+                onClick={isRecording ? stopRecording : handleMicrophoneClick}
                 aria-label={
-                  micCountdown > 0
-                    ? `Voice input begins in ${micCountdown} second${
-                        micCountdown === 1 ? '' : 's'
-                      }`
+                  isRecording 
+                    ? 'Stop recording'
+                    : micCountdown > 0
+                    ? `Voice input begins in ${micCountdown} second${micCountdown === 1 ? '' : 's'}`
                     : 'Start voice input'
                 }
-                disabled={assistantBusy}
+                disabled={assistantBusy || !voiceSupported || micCountdown > 0}
+                title={!voiceSupported ? 'Voice not supported in this browser' : ''}
               >
                 {micCountdown > 0 ? (
                   <span className="mic-countdown" aria-hidden="true">
                     {micCountdown}
                   </span>
+                ) : isRecording ? (
+                  <span className="recording-indicator" aria-hidden="true">⏹</span>
                 ) : (
                   <img src={microphoneIcon} alt="" aria-hidden="true" />
                 )}
               </button>
+              {isSpeaking && (
+                <button
+                  type="button"
+                  className="stop-speech-button"
+                  onClick={stopSpeaking}
+                  aria-label="Stop speaking"
+                >
+                  🔇
+                </button>
+              )}
               <button
                 type="submit"
                 className="send-button"
-                disabled={assistantBusy}
+                disabled={assistantBusy || isRecording}
               >
                 Send
               </button>

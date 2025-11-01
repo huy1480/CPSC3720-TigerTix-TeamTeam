@@ -32,6 +32,17 @@ main[role='main'] {
   border-width: 0;
 }
 
+/* Voice warning banner */
+.voice-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
 /* Layout for events and assistant */
 .dashboard-layout {
   display: flex;
@@ -174,15 +185,6 @@ main[role='main'] {
   opacity: 0.6;
 }
 
-.event-helper {
-  margin-top: 16px;
-  font-size: 0.95rem;
-  color: #555;
-  background-color: #f9f1ff;
-  padding: 12px;
-  border-radius: 6px;
-}
-
 /* Chat assistant styles */
 .chat-panel {
   max-height: 720px;
@@ -221,11 +223,38 @@ main[role='main'] {
   color: #ffffff;
 }
 
-.assistant-status {
+.assistant-status,
+.recording-status,
+.speaking-status {
   margin-bottom: 12px;
   font-size: 0.95rem;
   color: #666;
   text-align: left;
+  padding: 8px 12px;
+  background-color: #f4f0ff;
+  border-radius: 6px;
+}
+
+.recording-status {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.speaking-status {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .booking-confirmation {
@@ -289,6 +318,11 @@ main[role='main'] {
   font-size: 1rem;
 }
 
+.chat-input input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
 .chat-input .send-button {
   padding: 12px 20px;
   background-color: #f56600;
@@ -314,23 +348,53 @@ main[role='main'] {
   transform: scale(0.98);
 }
 
+/* Voice control buttons */
 .chat-input .mic-button {
   width: 44px;
   height: 44px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid #c9c3da;
+  border: 2px solid #522d80;
   background-color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: all 0.2s;
+  position: relative;
 }
 
 .chat-input .mic-button img {
   width: 20px;
   height: 20px;
+}
+
+.chat-input .mic-button.recording {
+  background-color: #ff4444;
+  border-color: #cc0000;
+  animation: recordingPulse 1s ease-in-out infinite;
+}
+
+.chat-input .mic-button.recording .recording-indicator {
+  color: white;
+  font-size: 20px;
+}
+
+@keyframes recordingPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(255, 68, 68, 0);
+  }
+}
+
+.chat-input .mic-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #cccccc;
 }
 
 .chat-input .mic-countdown {
@@ -339,8 +403,9 @@ main[role='main'] {
   color: #522d80;
 }
 
-.chat-input .mic-button:hover:not(:disabled) {
+.chat-input .mic-button:hover:not(:disabled):not(.recording) {
   background-color: #f4f0ff;
+  transform: scale(1.05);
 }
 
 .chat-input .mic-button:active:not(:disabled) {
@@ -350,6 +415,30 @@ main[role='main'] {
 .chat-input .mic-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.chat-input .stop-speech-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #155724;
+  background-color: #d4edda;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 20px;
+}
+
+.chat-input .stop-speech-button:hover {
+  background-color: #c3e6cb;
+  transform: scale(1.05);
+}
+
+.chat-input .stop-speech-button:active {
+  transform: scale(0.95);
 }
 
 /* Focus styles */
@@ -384,6 +473,21 @@ textarea:focus {
   .chat-panel {
     max-height: none;
   }
+  
+  .chat-input {
+    flex-wrap: wrap;
+  }
+  
+  .chat-input input {
+    flex: 1 1 100%;
+    min-width: 200px;
+  }
+  
+  .chat-input .mic-button,
+  .chat-input .send-button,
+  .chat-input .stop-speech-button {
+    flex: 0 0 auto;
+  }
 }
 
 /* High contrast support */
@@ -391,5 +495,22 @@ textarea:focus {
   .chat-input button,
   .booking-actions button {
     border: 2px solid black;
+  }
+  
+  .mic-button {
+    border-width: 3px !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .chat-messages {
+    scroll-behavior: auto;
   }
 }
