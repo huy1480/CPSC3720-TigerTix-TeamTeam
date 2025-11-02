@@ -115,27 +115,57 @@ npm install --save-dev jest@29.7.0 supertest@6.3.3 --silent 2>/dev/null || true
 echo -e "${GREEN}✓ All dependencies installed${NC}"
 
 # Run Backend Tests
-print_header "Backend Unit Tests"
+print_header "Backend Unit & Integration Tests"
 
 echo -e "${BLUE}Testing Admin Service...${NC}"
 cd backend/admin-service
+
+# Admin Controller Unit Tests
 if [ -f "__tests__/adminController.test.js" ]; then
-    run_test "Admin Controller Tests" "npx jest __tests__/adminController.test.js --silent 2>/dev/null || npx jest __tests__/adminController.test.js"
+    run_test "Admin Controller Unit Tests (12 tests)" "npx jest __tests__/adminController.test.js --silent 2>/dev/null || npx jest __tests__/adminController.test.js"
     ((TOTAL_TESTS++))
 else
-    echo -e "${YELLOW}⚠ Admin tests not found${NC}"
+    echo -e "${YELLOW}⚠ Admin controller tests not found${NC}"
 fi
+
+# Admin API Integration Tests
+if [ -f "__tests__/api.integration.test.js" ]; then
+    run_test "Admin API Integration Tests (40+ tests)" "npx jest __tests__/api.integration.test.js --silent 2>/dev/null || npx jest __tests__/api.integration.test.js"
+    ((TOTAL_TESTS++))
+else
+    echo -e "${YELLOW}⚠ Admin API integration tests not found${NC}"
+fi
+
 cd ../..
 
 echo ""
 echo -e "${BLUE}Testing Client Service...${NC}"
 cd backend/client-service
+
+# LLM Service Unit Tests
 if [ -f "__tests__/llmService.test.js" ]; then
-    run_test "LLM Service Tests" "npx jest __tests__/llmService.test.js --silent 2>/dev/null || npx jest __tests__/llmService.test.js"
+    run_test "LLM Service Unit Tests (25 tests)" "npx jest __tests__/llmService.test.js --silent 2>/dev/null || npx jest __tests__/llmService.test.js"
     ((TOTAL_TESTS++))
 else
     echo -e "${YELLOW}⚠ LLM Service tests not found${NC}"
 fi
+
+# Client API Integration Tests
+if [ -f "__tests__/api.integration.test.js" ]; then
+    run_test "Client API Integration Tests (45+ tests)" "npx jest __tests__/api.integration.test.js --silent 2>/dev/null || npx jest __tests__/api.integration.test.js"
+    ((TOTAL_TESTS++))
+else
+    echo -e "${YELLOW}⚠ Client API integration tests not found${NC}"
+fi
+
+# Client Model Database Tests
+if [ -f "__tests__/clientModel.test.js" ]; then
+    run_test "Client Model Database Tests (35+ tests)" "npx jest __tests__/clientModel.test.js --silent 2>/dev/null || npx jest __tests__/clientModel.test.js"
+    ((TOTAL_TESTS++))
+else
+    echo -e "${YELLOW}⚠ Client model tests not found${NC}"
+fi
+
 cd ../..
 
 # Run Frontend Tests
