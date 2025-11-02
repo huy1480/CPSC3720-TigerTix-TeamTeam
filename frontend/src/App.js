@@ -223,93 +223,18 @@ function App() {
     
     if (SpeechRecognition && speechSynthesis) {
       setVoiceSupported(true);
-      
-      // Only initialize if not already initialized
-      if (!recognitionRef.current) {
-        // Initialize Speech Recognition
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'en-US';
-      }
-      
-      // Initialize Speech Synthesis
-      if (!synthRef.current) {
-        synthRef.current = speechSynthesis;
-      }
+      synthRef.current = speechSynthesis;
     } else {
       console.warn('Web Speech API not supported in this browser');
     }
     
     // Cleanup on unmount only
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {
-          // Ignore abort errors on cleanup
-        }
-      }
       if (synthRef.current) {
         synthRef.current.cancel();
       }
     };
   }, []); // Empty dependency array - run once on mount
-
-  // Setup recognition event handlers separately (updates when handlers change)
-  useEffect(() => {
-    if (!recognitionRef.current) return;
-
-    const handleResult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      console.log('Voice recognized:', transcript);
-      
-      // Display recognized text in chat
-      appendMessage('user', transcript);
-      setChatInput('');
-      setIsRecording(false);
-      
-      // Send to LLM for processing
-      handleVoiceInput(transcript);
-    };
-
-    const handleError = (event) => {
-      console.error('Speech recognition error:', event.error);
-      setIsRecording(false);
-      
-      // Don't show error for intentional aborts or network errors during reset
-      if (event.error === 'aborted') {
-        return;
-      }
-      
-      if (event.error === 'network') {
-        // Network error often happens during abort/restart - don't show message
-        console.log('Network error (likely during reset), ignoring');
-        return;
-      }
-      
-      let errorMessage = 'Sorry, I had trouble understanding that.';
-      if (event.error === 'no-speech') {
-        errorMessage = 'No speech was detected. Please try again.';
-      } else if (event.error === 'not-allowed') {
-        errorMessage = 'Microphone access was denied. Please enable it in your browser settings.';
-      }
-      
-      appendMessage('assistant', errorMessage);
-    };
-
-    const handleEnd = () => {
-      console.log('Recognition ended');
-      setIsRecording(false);
-    };
-
-    // Attach handlers
-    recognitionRef.current.onresult = handleResult;
-    recognitionRef.current.onerror = handleError;
-    recognitionRef.current.onend = handleEnd;
-
-    // No cleanup needed here - handlers are just being reassigned
-  }, [appendMessage, handleVoiceInput]); // Update handlers when these change
 
   // Fetch events dynamically from the client microservice
   useEffect(() => {
@@ -503,40 +428,89 @@ function App() {
   };
 
   const startRecording = () => {
-    if (!recognitionRef.current || !voiceSupported) {
+    if (!voiceSupported) {
       appendMessage('assistant', 'Voice input is not supported in your browser.');
       return;
     }
 
-    // Check if already recording
     if (isRecording) {
-      console.log('Recognition already running, skipping start');
+      console.log('Already recording, skipping');
       return;
     }
 
     try {
-      recognitionRef.current.start();
-      setIsRecording(true);
-      // Only show message after successful start
-      appendMessage('assistant', 'Listening... Please speak now.');
-    } catch (error) {
-      console.error('Error starting recognition:', error);
+      // Create a fresh recognition instance each time
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
       
-      // If already started, just mark as recording and show message
-      if (error.message && error.message.includes('already started')) {
-        console.log('Recognition was already active, marking as recording');
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        console.log('Speech recognition started');
         setIsRecording(true);
         appendMessage('assistant', 'Listening... Please speak now.');
-      } else {
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('Voice recognized:', transcript);
+        
+        // Display recognized text in chat
+        appendMessage('user', transcript);
         setIsRecording(false);
-        appendMessage('assistant', 'Could not start voice recognition. Please try again.');
-      }
+        
+        // Send to LLM for processing
+        handleVoiceInput(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+        
+        if (event.error === 'aborted') {
+          // Intentional abort, don't show error
+          return;
+        }
+        
+        if (event.error === 'no-speech') {
+          appendMessage('assistant', 'No speech was detected. Please try again.');
+        } else if (event.error === 'not-allowed') {
+          appendMessage('assistant', 'Microphone access was denied. Please enable it in your browser settings.');
+        } else if (event.error === 'network') {
+          appendMessage('assistant', 'Network error. Please check your connection and try again.');
+        } else {
+          appendMessage('assistant', 'Sorry, I had trouble with voice recognition. Please try again.');
+        }
+      };
+
+      recognition.onend = () => {
+        console.log('Speech recognition ended');
+        setIsRecording(false);
+      };
+
+      // Store reference for potential stop
+      recognitionRef.current = recognition;
+      
+      // Start recognition
+      recognition.start();
+      
+    } catch (error) {
+      console.error('Error creating recognition:', error);
+      setIsRecording(false);
+      appendMessage('assistant', 'Could not start voice recognition. Please try again.');
     }
   };
 
   const stopRecording = () => {
     if (recognitionRef.current && isRecording) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
       setIsRecording(false);
     }
   };
@@ -660,12 +634,6 @@ function App() {
             {assistantBusy && (
               <p className="assistant-status" role="status" aria-live="polite">
                 The assistant is thinking...
-              </p>
-            )}
-            
-            {isRecording && (
-              <p className="recording-status" role="status" aria-live="polite">
-                🎤 Recording... Speak now
               </p>
             )}
             
