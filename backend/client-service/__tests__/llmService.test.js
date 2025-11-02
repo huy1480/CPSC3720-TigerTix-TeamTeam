@@ -5,6 +5,9 @@
 
 const llmService = require('../services/llmService');
 
+// Increase timeout for LLM tests (Ollama can be slow)
+jest.setTimeout(60000); // 60 seconds
+
 describe('LLM Service - Natural Language Processing', () => {
   const mockEvents = [
     { id: 1, name: 'Jazz Night', date: '2025-12-01', tickets: 50 },
@@ -20,7 +23,7 @@ describe('LLM Service - Natural Language Processing', () => {
         const result = await llmService.parseUserInput(input, mockEvents);
         expect(result.intent).toBe('greet');
       }
-    });
+    }, 60000); // 60 second timeout
 
     test('should recognize show_events intent', async () => {
       const inputs = [
@@ -36,7 +39,7 @@ describe('LLM Service - Natural Language Processing', () => {
         expect(result.events).toBeDefined();
         expect(Array.isArray(result.events)).toBe(true);
       }
-    });
+    }, 60000); // 60 second timeout
 
     test('should recognize book intent', async () => {
       const inputs = [
@@ -49,7 +52,7 @@ describe('LLM Service - Natural Language Processing', () => {
         const result = await llmService.parseUserInput(input, mockEvents);
         expect(result.intent).toBe('book');
       }
-    });
+    }, 60000); // 60 second timeout
 
     test('should recognize event_details intent', async () => {
       const inputs = [
@@ -63,7 +66,7 @@ describe('LLM Service - Natural Language Processing', () => {
         const result = await llmService.parseUserInput(input, mockEvents);
         expect(['event_details', 'book']).toContain(result.intent);
       }
-    });
+    }, 60000); // 60 second timeout
 
     test('should recognize confirm intent', async () => {
       const inputs = ['yes', 'confirm', 'yes please', 'proceed'];
@@ -72,7 +75,7 @@ describe('LLM Service - Natural Language Processing', () => {
         const result = await llmService.parseUserInput(input, mockEvents);
         expect(result.intent).toBe('confirm');
       }
-    });
+    }, 60000); // 60 second timeout
 
     test('should recognize cancel intent', async () => {
       const inputs = ['no', 'cancel', 'never mind', 'no thanks'];
@@ -81,7 +84,7 @@ describe('LLM Service - Natural Language Processing', () => {
         const result = await llmService.parseUserInput(input, mockEvents);
         expect(result.intent).toBe('cancel');
       }
-    });
+    }, 60000); // 60 second timeout
   });
 
   describe('Event Name Extraction', () => {
@@ -97,7 +100,7 @@ describe('LLM Service - Natural Language Processing', () => {
         id: 1,
         name: 'Jazz Night'
       });
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle case-insensitive event names', async () => {
       const result = await llmService.parseUserInput(
@@ -107,7 +110,7 @@ describe('LLM Service - Natural Language Processing', () => {
       
       expect(result.eventId).toBe(1);
       expect(result.event.name).toBe('Jazz Night');
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle partial event name matches', async () => {
       const result = await llmService.parseUserInput(
@@ -118,7 +121,7 @@ describe('LLM Service - Natural Language Processing', () => {
       // Should match "Spring Concert"
       expect(result.event).toBeDefined();
       expect(result.event.name).toContain('Spring');
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle event names with numbers', async () => {
       const result = await llmService.parseUserInput(
@@ -128,7 +131,7 @@ describe('LLM Service - Natural Language Processing', () => {
       
       expect(result.eventId).toBe(3);
       expect(result.event.name).toBe('Hackathon 2025');
-    });
+    }, 60000); // 60 second timeout
 
     test('should return null for unknown event names', async () => {
       const result = await llmService.parseUserInput(
@@ -138,7 +141,7 @@ describe('LLM Service - Natural Language Processing', () => {
       
       expect(result.event).toBeUndefined();
       expect(result.rawEventName).toBeTruthy();
-    });
+    }, 60000); // 60 second timeout
   });
 
   describe('Ticket Quantity Parsing', () => {
@@ -149,7 +152,7 @@ describe('LLM Service - Natural Language Processing', () => {
       );
       
       expect(result.tickets).toBe(3);
-    });
+    }, 60000); // 60 second timeout
 
     test('should extract written number quantities', async () => {
       const testCases = [
@@ -162,7 +165,7 @@ describe('LLM Service - Natural Language Processing', () => {
         const result = await llmService.parseUserInput(testCase.input, mockEvents);
         expect(result.tickets).toBe(testCase.expected);
       }
-    });
+    }, 60000); // 60 second timeout
 
     test('should default to 1 ticket when quantity not specified', async () => {
       const result = await llmService.parseUserInput(
@@ -171,7 +174,7 @@ describe('LLM Service - Natural Language Processing', () => {
       );
       
       expect(result.tickets).toBe(1);
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle large quantities', async () => {
       const result = await llmService.parseUserInput(
@@ -180,7 +183,7 @@ describe('LLM Service - Natural Language Processing', () => {
       );
       
       expect(result.tickets).toBe(25);
-    });
+    }, 60000); // 60 second timeout
   });
 
   describe('Error Handling', () => {
@@ -262,7 +265,7 @@ describe('LLM Service - Natural Language Processing', () => {
       const result = await llmService.parseUserInput(longInput, mockEvents);
       
       expect(result).toHaveProperty('intent');
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle special characters in input', async () => {
       const result = await llmService.parseUserInput(
@@ -271,7 +274,7 @@ describe('LLM Service - Natural Language Processing', () => {
       );
       
       expect(result.intent).toBe('book');
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle multiple event names in input', async () => {
       const result = await llmService.parseUserInput(
@@ -281,7 +284,7 @@ describe('LLM Service - Natural Language Processing', () => {
       
       expect(result.intent).toBe('book');
       expect(result.event).toBeDefined();
-    });
+    }, 60000); // 60 second timeout
 
     test('should handle ambiguous input', async () => {
       const result = await llmService.parseUserInput(
@@ -291,7 +294,7 @@ describe('LLM Service - Natural Language Processing', () => {
       
       expect(result.intent).toBeDefined();
       // Should not crash, should return some intent
-    });
+    }, 60000); // 60 second timeout
   });
 
   describe('Source Attribution', () => {
