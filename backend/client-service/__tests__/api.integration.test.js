@@ -5,13 +5,27 @@
 
 const request = require('supertest');
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const clientRoutes = require('../routes/clientRoutes');
 const clientModel = require('../models/clientModel');
+const { JWT_SECRET } = require('../../user-authentication/utils/jwt');
 
 // Create test app
 const app = express();
 app.use(express.json());
 app.use(clientRoutes);
+
+const TEST_TOKEN = jwt.sign(
+  { id: 9000, email: 'test.user@example.com' },
+  JWT_SECRET,
+  { expiresIn: '30m' }
+);
+
+const withAuth = (req) =>
+  req.set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+const authedPost = (endpoint) =>
+  withAuth(request(app).post(endpoint));
 
 describe('Client Service API Integration Tests', () => {
   
@@ -178,8 +192,7 @@ describe('Client Service API Integration Tests', () => {
 
   describe('POST /api/bookings/confirm', () => {
     test('should require eventId', async () => {
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ tickets: 2 })
         .expect('Content-Type', /json/)
         .expect(400);
@@ -189,8 +202,7 @@ describe('Client Service API Integration Tests', () => {
     });
 
     test('should require tickets', async () => {
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ eventId: 1 })
         .expect('Content-Type', /json/)
         .expect(400);
@@ -200,8 +212,7 @@ describe('Client Service API Integration Tests', () => {
     });
 
     test('should reject invalid eventId', async () => {
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ eventId: -1, tickets: 2 })
         .expect('Content-Type', /json/);
 
@@ -209,8 +220,7 @@ describe('Client Service API Integration Tests', () => {
     });
 
     test('should reject zero tickets', async () => {
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ eventId: 1, tickets: 0 })
         .expect('Content-Type', /json/);
 
@@ -218,8 +228,7 @@ describe('Client Service API Integration Tests', () => {
     });
 
     test('should reject negative tickets', async () => {
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ eventId: 1, tickets: -5 })
         .expect('Content-Type', /json/);
 
@@ -227,8 +236,7 @@ describe('Client Service API Integration Tests', () => {
     });
 
     test('should handle booking with insufficient tickets', async () => {
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ eventId: 1, tickets: 10000 })
         .expect('Content-Type', /json/);
 
@@ -241,8 +249,7 @@ describe('Client Service API Integration Tests', () => {
     test('should accept valid booking request', async () => {
       // This test may fail if event doesn't exist or has no tickets
       // It's designed to test the happy path when conditions are right
-      const response = await request(app)
-        .post('/api/bookings/confirm')
+      const response = await authedPost('/api/bookings/confirm')
         .send({ 
           eventId: 1, 
           tickets: 1,
@@ -260,8 +267,7 @@ describe('Client Service API Integration Tests', () => {
 
   describe('POST /api/events/:id/purchase (Legacy)', () => {
     test('should handle direct purchase', async () => {
-      const response = await request(app)
-        .post('/api/events/1/purchase')
+      const response = await authedPost('/api/events/1/purchase')
         .send({})
         .expect('Content-Type', /json/);
 
@@ -274,8 +280,7 @@ describe('Client Service API Integration Tests', () => {
     });
 
     test('should reject invalid event ID in purchase', async () => {
-      const response = await request(app)
-        .post('/api/events/invalid/purchase')
+      const response = await authedPost('/api/events/invalid/purchase')
         .send({})
         .expect('Content-Type', /json/);
 

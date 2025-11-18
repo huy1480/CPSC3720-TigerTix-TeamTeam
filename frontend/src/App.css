@@ -68,6 +68,123 @@ main[role='main'] {
   color: #522d80;
 }
 
+.auth-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  background-color: #fafafa;
+  text-align: left;
+}
+
+.auth-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.auth-card-header h3 {
+  margin: 0;
+  color: #522d80;
+}
+
+.logout-button {
+  background: transparent;
+  border: 1px solid #d45500;
+  color: #d45500;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.logout-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.auth-toggle button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 999px;
+  border: 1px solid #cccccc;
+  background-color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-toggle button.active {
+  background-color: #f56600;
+  color: #ffffff;
+  border-color: #f56600;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-form label {
+  font-weight: 600;
+  color: #333333;
+}
+
+.auth-form input {
+  padding: 10px 12px;
+  border: 1px solid #cccccc;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.auth-form button {
+  margin-top: 8px;
+  padding: 10px 16px;
+  background-color: #522d80;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  background-color: #fdecea;
+  border: 1px solid #f5c6cb;
+  color: #b00020;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.auth-success {
+  background-color: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  color: #256029;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.auth-hint {
+  font-size: 0.9rem;
+  color: #555555;
+  margin-top: 8px;
+}
+
 .message-container {
   margin-bottom: 16px;
   display: flex;

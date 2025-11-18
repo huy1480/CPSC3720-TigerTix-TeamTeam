@@ -3,6 +3,9 @@ import './App.css';
 import microphoneIcon from './microphone.png';
 import beepSound from './Beep.mp3';
 
+const AUTH_API_BASE =
+  process.env.REACT_APP_AUTH_URL || 'http://localhost:6002';
+
 const createMessage = (role, text) => ({
   id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   role,
@@ -46,6 +49,11 @@ function App() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventsError, setEventsError] = useState('');
   const [bannerMessage, setBannerMessage] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authMode, setAuthMode] = useState('login');
+  const [authForm, setAuthForm] = useState({ email: '', password: '' });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
   
   // Voice-related state
   const [isRecording, setIsRecording] = useState(false);
@@ -57,6 +65,31 @@ function App() {
   const micTimerRef = useRef(null);
   const recognitionRef = useRef(null);
   const synthRef = useRef(null);
+
+  const handleAuthExpired = useCallback(() => {
+    setCurrentUser(null);
+    setPendingBooking(null);
+    setBannerMessage('Session expired. Please log in again.');
+    setAuthMode('login');
+    setAuthError('Session expired. Please log in again.');
+    setAuthForm({ email: '', password: '' });
+  }, []);
+
+  const callClientService = useCallback(
+    async (input, options = {}) => {
+      const response = await fetch(input, {
+        ...options,
+        credentials: 'include'
+      });
+
+      if (response.status === 401) {
+        handleAuthExpired();
+      }
+
+      return response;
+    },
+    [handleAuthExpired]
+  );
 
   const appendMessage = useCallback((role, text) => {
     setChatMessages((prev) => [...prev, createMessage(role, text)]);
@@ -105,6 +138,101 @@ function App() {
     
     synthRef.current.speak(utterance);
   }, [voiceSupported]);
+
+  const handleAuthModeChange = (mode) => {
+    setAuthMode(mode);
+    setAuthError('');
+    setAuthForm({ email: '', password: '' });
+  };
+
+  const handleAuthInputChange = (event) => {
+    const { name, value } = event.target;
+    setAuthForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      const endpoint = authMode === 'login' ? 'login' : 'register';
+      const payload = {
+        email: authForm.email.trim(),
+        password: authForm.password
+      };
+
+      if (!payload.email || !payload.password) {
+        setAuthError('Email and password are required');
+        setAuthLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${AUTH_API_BASE}/api/auth/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to authenticate');
+      }
+
+      setCurrentUser(data.user);
+      setBannerMessage(
+        authMode === 'login'
+          ? `Logged in as ${data.user.email}`
+          : 'Registration successful! You are now signed in.'
+      );
+      setAuthForm({ email: '', password: '' });
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setAuthLoading(true);
+    try {
+      await fetch(`${AUTH_API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.warn('Logout failed:', error);
+    } finally {
+      setCurrentUser(null);
+      setPendingBooking(null);
+      setAuthLoading(false);
+      setAuthError('');
+      setAuthMode('login');
+      setAuthForm({ email: '', password: '' });
+      setBannerMessage('Logged out successfully.');
+    }
+  };
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch(`${AUTH_API_BASE}/api/auth/me`, {
+          credentials: 'include'
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUser(data.user);
+        }
+      } catch (error) {
+        console.warn('Unable to retrieve current user', error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   const handleParseResponse = useCallback((data) => {
     switch (data.intent) {
@@ -188,7 +316,7 @@ function App() {
     setAssistantBusy(true);
 
     try {
-      const res = await fetch('/api/llm/parse', {
+      const res = await callClientService('/api/llm/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: transcript })
@@ -213,7 +341,7 @@ function App() {
     } finally {
       setAssistantBusy(false);
     }
-  }, [speakText, appendMessage, handleParseResponse]);
+  }, [speakText, appendMessage, handleParseResponse, callClientService]);
 
   // Initialize voice services (only once on mount)
   useEffect(() => {
@@ -241,7 +369,7 @@ function App() {
     const fetchEvents = async () => {
       setLoadingEvents(true);
       try {
-        const res = await fetch('/api/events');
+        const res = await callClientService('/api/events');
         if (!res.ok) {
           throw new Error('Unable to load events');
         }
@@ -261,7 +389,7 @@ function App() {
     };
 
     fetchEvents();
-  }, [appendMessage]);
+  }, [appendMessage, callClientService]);
 
   const sendChatMessage = async () => {
     const trimmed = chatInput.trim();
@@ -272,7 +400,7 @@ function App() {
     setAssistantBusy(true);
 
     try {
-      const res = await fetch('/api/llm/parse', {
+      const res = await callClientService('/api/llm/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: trimmed })
@@ -320,9 +448,14 @@ function App() {
   const confirmBooking = async () => {
     if (!pendingBooking || assistantBusy) return;
 
+    if (!currentUser) {
+      setBannerMessage('Please log in to confirm bookings.');
+      return;
+    }
+
     setAssistantBusy(true);
     try {
-      const res = await fetch('/api/bookings/confirm', {
+      const res = await callClientService('/api/bookings/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -360,8 +493,13 @@ function App() {
   };
 
   const buyTicket = async (event) => {
+    if (!currentUser) {
+      setBannerMessage('Please log in to purchase tickets.');
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/events/${event.id}/purchase`, {
+      const res = await callClientService(`/api/events/${event.id}/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -549,6 +687,107 @@ function App() {
         
         <section className="dashboard-layout" aria-label="Events and booking assistant">
           <div className="events-panel">
+            <section
+              className="auth-card"
+              aria-label="User authentication controls"
+              aria-live="polite"
+            >
+              <div className="auth-card-header">
+                <h3>
+                  {currentUser
+                    ? `Logged in as ${currentUser.email}`
+                    : 'Sign in to book tickets'}
+                </h3>
+                {currentUser && (
+                  <button
+                    type="button"
+                    className="logout-button"
+                    onClick={handleLogout}
+                    disabled={authLoading}
+                  >
+                    Logout
+                  </button>
+                )}
+              </div>
+
+              {authError && (
+                <p className="auth-error" role="alert">
+                  {authError}
+                </p>
+              )}
+
+              {currentUser ? (
+                <p className="auth-success">
+                  Session active — tokens expire after 30 minutes of inactivity.
+                </p>
+              ) : (
+                <>
+                  <div
+                    className="auth-toggle"
+                    role="tablist"
+                    aria-label="Authentication mode"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={authMode === 'login'}
+                      className={authMode === 'login' ? 'active' : ''}
+                      onClick={() => handleAuthModeChange('login')}
+                      disabled={authLoading}
+                    >
+                      Login
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={authMode === 'register'}
+                      className={authMode === 'register' ? 'active' : ''}
+                      onClick={() => handleAuthModeChange('register')}
+                      disabled={authLoading}
+                    >
+                      Register
+                    </button>
+                  </div>
+                  <form className="auth-form" onSubmit={handleAuthSubmit}>
+                    <label htmlFor="auth-email">Email</label>
+                    <input
+                      id="auth-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      value={authForm.email}
+                      onChange={handleAuthInputChange}
+                      disabled={authLoading}
+                      required
+                    />
+
+                    <label htmlFor="auth-password">Password</label>
+                    <input
+                      id="auth-password"
+                      name="password"
+                      type="password"
+                      autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                      value={authForm.password}
+                      onChange={handleAuthInputChange}
+                      disabled={authLoading}
+                      required
+                    />
+
+                    <button type="submit" disabled={authLoading}>
+                      {authLoading
+                        ? 'Please wait...'
+                        : authMode === 'login'
+                        ? 'Login'
+                        : 'Register'}
+                    </button>
+                  </form>
+                  <p className="auth-hint">
+                    Password must be at least 8 characters. Session expires after 30 minutes.
+                  </p>
+                </>
+              )}
+            </section>
+
             <h2 id="events-heading">Available Events</h2>
             {bannerMessage && (
               <div
@@ -600,12 +839,27 @@ function App() {
                         type="button"
                         className="buy-button"
                         onClick={() => buyTicket(event)}
-                        aria-label={`Purchase ticket for ${event.name}. ${event.tickets} tickets available.`}
+                        aria-label={
+                          event.tickets > 0
+                            ? currentUser
+                              ? `Purchase ticket for ${event.name}. ${event.tickets} tickets available.`
+                              : `Login required to buy tickets for ${event.name}.`
+                            : `Sold out: ${event.name}`
+                        }
                         aria-describedby={`tickets-${event.id}`}
-                        disabled={event.tickets <= 0}
+                        disabled={!currentUser || event.tickets <= 0}
                       >
-                        {event.tickets > 0 ? 'Buy Ticket' : 'Sold Out'}
+                        {event.tickets <= 0
+                          ? 'Sold Out'
+                          : currentUser
+                          ? 'Buy Ticket'
+                          : 'Login to Buy'}
                       </button>
+                      {!currentUser && (
+                        <p className="auth-hint">
+                          Sign in above to enable quick checkout.
+                        </p>
+                      )}
                     </article>
                   </li>
                 ))}
@@ -657,11 +911,16 @@ function App() {
                     : ''}
                   ?
                 </p>
+                {!currentUser && (
+                  <p className="auth-hint">
+                    Please log in to confirm bookings.
+                  </p>
+                )}
                 <div className="booking-actions">
                   <button
                     type="button"
                     onClick={confirmBooking}
-                    disabled={assistantBusy}
+                    disabled={assistantBusy || !currentUser}
                   >
                     Confirm Booking
                   </button>

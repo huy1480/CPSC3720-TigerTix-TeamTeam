@@ -70,8 +70,9 @@ exports.getEventById = async (req, res) => {
  */
 exports.purchaseTicket = async (req, res) => {
   const eventId = req.params.id;
+  const purchaser = req.user?.email || 'Authenticated Guest';
   try {
-    const result = await clientModel.purchaseTicket(eventId);
+    const result = await clientModel.purchaseTicket(eventId, purchaser);
     res.status(200).json(result);
   } catch (error) {
     const status = error.status || 500;
@@ -198,7 +199,7 @@ exports.confirmBooking = async (req, res) => {
     const confirmation = await clientModel.confirmBooking(
       eventId,
       tickets,
-      customerName || 'Guest'
+      customerName || req.user?.email || 'Guest'
     );
 
     res.status(200).json({

@@ -6,6 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const clientController = require('../controllers/clientController');
+const {
+  requireAuth,
+  attachUserIfAvailable
+} = require('../../user-authentication/middleware/authMiddleware');
+
+router.use(attachUserIfAvailable);
 
 /**
  * GET /api/events
@@ -32,7 +38,11 @@ router.get('/api/events/:id', clientController.getEventById);
  * Params: id (event ID)
  * Response: 200 with purchase confirmation or error
  */
-router.post('/api/events/:id/purchase', clientController.purchaseTicket);
+router.post(
+  '/api/events/:id/purchase',
+  requireAuth,
+  clientController.purchaseTicket
+);
 
 /**
  * POST /api/llm/parse
@@ -44,6 +54,10 @@ router.post('/api/llm/parse', clientController.parseLLMRequest);
  * POST /api/bookings/confirm
  * Finalize a booking after explicit confirmation
  */
-router.post('/api/bookings/confirm', clientController.confirmBooking);
+router.post(
+  '/api/bookings/confirm',
+  requireAuth,
+  clientController.confirmBooking
+);
 
 module.exports = router;

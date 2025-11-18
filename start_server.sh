@@ -20,6 +20,9 @@ node ./backend/client-service/server.js &
 echo "Starting admin service";
 node ./backend/admin-service/server.js &
 
+echo "Starting user authentication service";
+node ./backend/user-authentication/server.js &
+
 echo "Starting frontend";
 npm start --prefix ./frontend
 

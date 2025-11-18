@@ -52,9 +52,9 @@ exports.getAllEvents = () => {
  * @param {number} eventId - ID of the event to purchase a ticket for
  * @returns {Promise<Object>} Result message and remaining tickets
  */
-exports.purchaseTicket = (eventId) => {
+exports.purchaseTicket = (eventId, customerName = 'Direct Purchase') => {
   return exports
-    .confirmBooking(eventId, 1, 'Direct Purchase')
+    .confirmBooking(eventId, 1, customerName || 'Direct Purchase')
     .then((result) => ({
       message: 'Ticket purchased successfully',
       remaining: result.remainingTickets,
