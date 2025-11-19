@@ -88,13 +88,22 @@ describe('Admin Service API Integration Tests', () => {
       expect(response.body.details).toContain('Number of tickets is required');
     });
 
+    test('should reject event with zero tickets', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', date: '2025-12-31', tickets: 0 })
+        .expect(400);
+
+      expect(response.body.details).toContain('positive number');
+    });
+
     test('should reject event with negative tickets', async () => {
       const response = await request(app)
         .post('/api/admin/events')
         .send({ name: 'Test Event', date: '2025-12-31', tickets: -10 })
         .expect(400);
 
-      expect(response.body.details).toContain('non-negative number');
+      expect(response.body.details).toContain('positive number');
     });
 
     test('should reject event with non-numeric tickets', async () => {
@@ -130,17 +139,46 @@ describe('Admin Service API Integration Tests', () => {
       expect(response.body.event.date).toBe('2025-12-31');
     });
 
-    test('should accept zero tickets', async () => {
+    test('should accept event with exactly 1 ticket', async () => {
       const response = await request(app)
         .post('/api/admin/events')
         .send({
-          name: 'Event with No Tickets',
+          name: 'Event with One Ticket',
           date: '2025-12-31',
-          tickets: 0
+          tickets: 1
         })
         .expect(201);
 
-      expect(response.body.event.tickets).toBe(0);
+      expect(response.body.event.tickets).toBe(1);
+    });
+
+    test('should reject event name exceeding 60 characters', async () => {
+      const longName = 'A'.repeat(61);
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: longName,
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('cannot exceed 60 characters');
+    });
+
+    test('should accept event name with exactly 60 characters', async () => {
+      const exactlyFiftyName = 'A'.repeat(60);
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: exactlyFiftyName,
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
+
+      expect(response.body.event.name).toBe(exactlyFiftyName);
+      expect(response.body.event.name.length).toBe(60);
     });
   });
 
@@ -273,6 +311,19 @@ describe('Admin Service API Integration Tests', () => {
       expect(response.body.details).toContain('Invalid date format');
     });
 
+    test('should reject update with zero tickets', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          name: 'Test Event',
+          date: '2025-12-31',
+          tickets: 0
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('positive number');
+    });
+
     test('should reject update with negative tickets', async () => {
       const response = await request(app)
         .put('/api/admin/events/1')
@@ -283,7 +334,20 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('non-negative');
+      expect(response.body.details).toContain('positive');
+    });
+
+    test('should reject update with name exceeding 60 characters', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          name: 'A'.repeat(61),
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('cannot exceed 60 characters');
     });
   });
 
@@ -335,7 +399,7 @@ describe('Admin Service API Integration Tests', () => {
   });
 
   describe('Input Validation', () => {
-    test('should validate event name length', async () => {
+    test('should reject event name longer than 60 characters', async () => {
       const longName = 'A'.repeat(1000);
       const response = await request(app)
         .post('/api/admin/events')
@@ -343,10 +407,10 @@ describe('Admin Service API Integration Tests', () => {
           name: longName,
           date: '2025-12-31',
           tickets: 50
-        });
+        })
+        .expect(400);
 
-      // Should either accept or reject based on business rules
-      expect([200, 201, 400]).toContain(response.status);
+      expect(response.body.details).toContain('cannot exceed 60 characters');
     });
 
     test('should handle special characters in name', async () => {
@@ -356,10 +420,10 @@ describe('Admin Service API Integration Tests', () => {
           name: 'Event with Special Chars: @#$%',
           date: '2025-12-31',
           tickets: 50
-        });
+        })
+        .expect(201);
 
-      // Should either accept or sanitize
-      expect([200, 201, 400]).toContain(response.status);
+      expect(response.body.event.name).toBe('Event with Special Chars: @#$%');
     });
 
     test('should handle very large ticket numbers', async () => {
@@ -369,9 +433,10 @@ describe('Admin Service API Integration Tests', () => {
           name: 'Large Capacity Event',
           date: '2025-12-31',
           tickets: 1000000
-        });
+        })
+        .expect(201);
 
-      expect([200, 201, 400]).toContain(response.status);
+      expect(response.body.event.tickets).toBe(1000000);
     });
   });
 

@@ -12,7 +12,7 @@ cleanup() {
 }
 
 echo "Starting ollama";
-ollama run llama3 &
+ollama run tinyllama &
 
 echo "Starting client service";
 node ./backend/client-service/server.js &

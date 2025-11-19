@@ -76,7 +76,7 @@ describe('Admin Service API Integration Tests', () => {
         .send({ name: 'Test Event', date: 'invalid-date', tickets: 100 })
         .expect(400);
 
-      expect(response.body.details).toContain('Invalid date format');
+      expect(response.body.details).toContain('Invalid date format. Use ISO format (YYYY-MM-DD)');
     });
 
     test('should reject event with missing tickets', async () => {
@@ -94,7 +94,7 @@ describe('Admin Service API Integration Tests', () => {
         .send({ name: 'Test Event', date: '2025-12-31', tickets: 0 })
         .expect(400);
 
-      expect(response.body.details).toContain('positive number');
+      expect(response.body.details).toContain('Tickets must be a positive number (at least 1)');
     });
 
     test('should reject event with negative tickets', async () => {
@@ -103,7 +103,7 @@ describe('Admin Service API Integration Tests', () => {
         .send({ name: 'Test Event', date: '2025-12-31', tickets: -10 })
         .expect(400);
 
-      expect(response.body.details).toContain('positive number');
+      expect(response.body.details).toContain('Tickets must be a positive number (at least 1)');
     });
 
     test('should reject event with non-numeric tickets', async () => {
@@ -163,7 +163,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('cannot exceed 60 characters');
+      expect(response.body.details).toContain('Event name cannot exceed 60 characters');
     });
 
     test('should accept event name with exactly 60 characters', async () => {
@@ -308,7 +308,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('Invalid date format');
+      expect(response.body.details).toContain('Invalid date format. Use ISO format (YYYY-MM-DD)');
     });
 
     test('should reject update with zero tickets', async () => {
@@ -321,7 +321,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('positive number');
+      expect(response.body.details).toContain('Tickets must be a positive number (at least 1)');
     });
 
     test('should reject update with negative tickets', async () => {
@@ -334,7 +334,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('positive');
+      expect(response.body.details).toContain('Tickets must be a positive number (at least 1)');
     });
 
     test('should reject update with name exceeding 60 characters', async () => {
@@ -347,7 +347,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('cannot exceed 60 characters');
+      expect(response.body.details).toContain('Event name cannot exceed 60 characters');
     });
   });
 
@@ -410,7 +410,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('cannot exceed 60 characters');
+      expect(response.body.details).toContain('Event name cannot exceed 60 characters');
     });
 
     test('should handle special characters in name', async () => {

@@ -76,7 +76,7 @@ describe('Admin Service API Integration Tests', () => {
         .send({ name: 'Test Event', date: 'invalid-date', tickets: 100 })
         .expect(400);
 
-      expect(response.body.details).toContain('Invalid date format');
+      expect(response.body.details).toContain('Invalid date format. Use ISO format (YYYY-MM-DD)');
     });
 
     test('should reject event with missing tickets', async () => {
@@ -94,7 +94,7 @@ describe('Admin Service API Integration Tests', () => {
         .send({ name: 'Test Event', date: '2025-12-31', tickets: -10 })
         .expect(400);
 
-      expect(response.body.details).toContain('non-negative number');
+      expect(response.body.details).toContain('Tickets must be a positive number (at least 1)');
     });
 
     test('should reject event with non-numeric tickets', async () => {
@@ -270,7 +270,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('Invalid date format');
+      expect(response.body.details).toContain('Invalid date format. Use ISO format (YYYY-MM-DD)');
     });
 
     test('should reject update with negative tickets', async () => {
@@ -283,7 +283,7 @@ describe('Admin Service API Integration Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.details).toContain('non-negative');
+      expect(response.body.details).toContain('Tickets must be a positive number (at least 1)');
     });
   });
 
