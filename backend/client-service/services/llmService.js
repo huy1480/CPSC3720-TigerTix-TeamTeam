@@ -18,8 +18,8 @@ const numberWords = {
 };
 
 // Default Ollama settings
-const OLLAMA_HOST = process.env.OLLAMA_HOST?.trim() || 'http://127.0.0.1:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL?.trim() || 'llama3:latest';
+const OLLAMA_HOST = process.env.OLLAMA_HOST?.trim() || 'http:127.0.0.1:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL?.trim() || 'tinyllama:latest';
 
 /**
  * Send JSON POST request to Ollama
