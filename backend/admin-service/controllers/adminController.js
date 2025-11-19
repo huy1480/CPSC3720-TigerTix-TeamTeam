@@ -18,6 +18,8 @@ function validateEventData(eventData) {
   // Check for required fields
   if (!eventData.name || eventData.name.trim() === '') {
     errors.push('Event name is required');
+  } else if (eventData.name.trim().length > 60) {
+    errors.push('Event name cannot exceed 60 characters');
   }
   
   if (!eventData.date || eventData.date.trim() === '') {
@@ -26,8 +28,8 @@ function validateEventData(eventData) {
   
   if (eventData.tickets === undefined || eventData.tickets === null) {
     errors.push('Number of tickets is required');
-  } else if (typeof eventData.tickets !== 'number' || eventData.tickets < 0) {
-    errors.push('Tickets must be a non-negative number');
+  } else if (typeof eventData.tickets !== 'number' || eventData.tickets < 1) {
+    errors.push('Tickets must be a positive number (at least 1)');
   }
   
   // Validate date format (basic check for ISO format)
@@ -125,9 +127,9 @@ async function getEvents(req, res) {
     });
     
   } catch (error) {
-    console.error('Error fetching events:', error);
+    console.error('Error getting events:', error);
     res.status(500).json({
-      error: 'Failed to fetch events',
+      error: 'Failed to retrieve events',
       message: error.message
     });
   }
@@ -136,8 +138,6 @@ async function getEvents(req, res) {
 /**
  * Update an existing event
  * Purpose: Handle PUT request to update event details
- * Expected input: req.params.id and req.body with event data
- * Response: 200 with updated event, or 400/404/500 with error
  * 
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -146,14 +146,13 @@ async function updateEvent(req, res) {
   try {
     const eventId = parseInt(req.params.id, 10);
     
-    // Validate event ID
-    if (isNaN(eventId)) {
+    if (!eventId || eventId <= 0) {
       return res.status(400).json({
         error: 'Invalid event ID'
       });
     }
-    
-    // Validate event data
+
+    // Validate input data
     const validation = validateEventData(req.body);
     
     if (!validation.isValid) {
@@ -162,32 +161,31 @@ async function updateEvent(req, res) {
         details: validation.errors
       });
     }
-    
+
     // Extract and sanitize data
     const eventData = {
       name: req.body.name.trim(),
       date: req.body.date.trim(),
       tickets: parseInt(req.body.tickets, 10)
     };
-    
+
     // Update event in database
     const updatedEvent = await adminModel.updateEvent(eventId, eventData);
-    
+
     res.status(200).json({
       message: 'Event updated successfully',
       event: updatedEvent
     });
-    
+
   } catch (error) {
     console.error('Error updating event:', error);
     
     if (error.message === 'Event not found') {
       return res.status(404).json({
-        error: 'Event not found',
-        message: 'No event exists with the provided ID'
+        error: 'Event not found'
       });
     }
-    
+
     res.status(500).json({
       error: 'Failed to update event',
       message: error.message

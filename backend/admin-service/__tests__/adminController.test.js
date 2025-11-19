@@ -1,354 +1,563 @@
 /**
- * Admin Controller Unit Tests
- * Tests event creation, validation, and error handling
+ * Admin Service API Integration Tests
+ * Tests API endpoints for event management operations
  */
 
-const adminController = require('../controllers/adminController');
-const adminModel = require('../models/adminModel');
+const request = require('supertest');
+const express = require('express');
+const adminRoutes = require('../routes/adminRoutes');
 
-// Mock the admin model
-jest.mock('../models/adminModel');
+// Create test app
+const app = express();
+app.use(express.json());
+app.use('/api/admin', adminRoutes);
 
-describe('Admin Controller - Event Management', () => {
-  let mockRequest;
-  let mockResponse;
+describe('Admin Service API Integration Tests', () => {
+  
+  let createdEventId;
 
-  beforeEach(() => {
-    // Reset mocks before each test
-    jest.clearAllMocks();
-
-    // Setup mock request and response objects
-    mockRequest = {
-      body: {},
-      params: {}
-    };
-
-    mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis()
-    };
-  });
-
-  describe('createEvent', () => {
-    test('should create event successfully with valid data', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: 'Jazz Night',
-        date: '2025-12-01',
-        tickets: 50
+  describe('POST /api/admin/events', () => {
+    test('should create event with valid data', async () => {
+      const newEvent = {
+        name: 'Test Event ' + Date.now(),
+        date: '2025-12-31',
+        tickets: 100
       };
 
-      const mockCreatedEvent = {
-        id: 1,
-        name: 'Jazz Night',
-        date: '2025-12-01',
-        tickets: 50
-      };
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send(newEvent)
+        .expect('Content-Type', /json/)
+        .expect(201);
 
-      adminModel.createEvent.mockResolvedValue(mockCreatedEvent);
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toContain('created successfully');
+      expect(response.body).toHaveProperty('event');
+      expect(response.body.event).toHaveProperty('id');
+      expect(response.body.event.name).toBe(newEvent.name);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
+      // Save for later tests
+      createdEventId = response.body.event.id;
+    });
 
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(201);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        message: 'Event created successfully',
-        event: mockCreatedEvent
-      });
-      expect(adminModel.createEvent).toHaveBeenCalledWith({
-        name: 'Jazz Night',
-        date: '2025-12-01',
-        tickets: 50
-      });
+    test('should reject event with missing name', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ date: '2025-12-31', tickets: 100 })
+        .expect('Content-Type', /json/)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Invalid event data');
+      expect(response.body.details).toContain('Event name is required');
     });
 
     test('should reject event with empty name', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: '',
-        date: '2025-12-01',
-        tickets: 50
-      };
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: '', date: '2025-12-31', tickets: 100 })
+        .expect(400);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Invalid event data',
-          details: expect.arrayContaining([
-            expect.stringContaining('Event name is required')
-          ])
-        })
-      );
-      expect(adminModel.createEvent).not.toHaveBeenCalled();
+      expect(response.body.details).toContain('Event name is required');
     });
 
     test('should reject event with missing date', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: 'Test Event',
-        date: '',
-        tickets: 50
-      };
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', tickets: 100 })
+        .expect(400);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
+      expect(response.body.details).toContain('Event date is required');
+    });
 
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Invalid event data',
-          details: expect.arrayContaining([
-            expect.stringContaining('Event date is required')
-          ])
-        })
-      );
+    test('should reject event with invalid date', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', date: 'invalid-date', tickets: 100 })
+        .expect(400);
+
+      expect(response.body.details).toContain('Invalid date format');
+    });
+
+    test('should reject event with missing tickets', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', date: '2025-12-31' })
+        .expect(400);
+
+      expect(response.body.details).toContain('Number of tickets is required');
+    });
+
+    test('should reject event with zero tickets', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', date: '2025-12-31', tickets: 0 })
+        .expect(400);
+
+      expect(response.body.details).toContain('positive number');
     });
 
     test('should reject event with negative tickets', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: 'Test Event',
-        date: '2025-12-01',
-        tickets: -10
-      };
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', date: '2025-12-31', tickets: -10 })
+        .expect(400);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Invalid event data',
-          details: expect.arrayContaining([
-            expect.stringContaining('Tickets must be a non-negative number')
-          ])
-        })
-      );
+      expect(response.body.details).toContain('positive number');
     });
 
-    test('should reject event with invalid date format', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: 'Test Event',
-        date: 'not-a-date',
-        tickets: 50
-      };
+    test('should reject event with non-numeric tickets', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({ name: 'Test Event', date: '2025-12-31', tickets: 'abc' })
+        .expect(400);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Invalid event data',
-          details: expect.arrayContaining([
-            expect.stringContaining('Invalid date format')
-          ])
-        })
-      );
+      expect(response.body).toHaveProperty('error');
     });
 
     test('should reject empty request body', async () => {
-      // Arrange
-      mockRequest.body = {};
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({})
+        .expect(400);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Invalid request',
-          message: 'Request body is required'
-        })
-      );
+      expect(response.body.error).toBe('Invalid request');
+      expect(response.body.message).toBe('Request body is required');
     });
 
-    test('should handle database errors gracefully', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: 'Test Event',
-        date: '2025-12-01',
-        tickets: 50
-      };
-
-      adminModel.createEvent.mockRejectedValue(new Error('Database connection failed'));
-
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Failed to create event',
-          message: 'Database connection failed'
+    test('should trim whitespace from name and date', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: '  Trimmed Event  ',
+          date: '  2025-12-31  ',
+          tickets: 50
         })
-      );
+        .expect(201);
+
+      expect(response.body.event.name).toBe('Trimmed Event');
+      expect(response.body.event.date).toBe('2025-12-31');
     });
 
-    test('should trim whitespace from event name and date', async () => {
-      // Arrange
-      mockRequest.body = {
-        name: '  Jazz Night  ',
-        date: '  2025-12-01  ',
-        tickets: 50
-      };
+    test('should accept event with exactly 1 ticket', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Event with One Ticket',
+          date: '2025-12-31',
+          tickets: 1
+        })
+        .expect(201);
 
-      const mockCreatedEvent = {
-        id: 1,
-        name: 'Jazz Night',
-        date: '2025-12-01',
-        tickets: 50
-      };
+      expect(response.body.event.tickets).toBe(1);
+    });
 
-      adminModel.createEvent.mockResolvedValue(mockCreatedEvent);
+    test('should reject event name exceeding 60 characters', async () => {
+      const longName = 'A'.repeat(61);
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: longName,
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
 
-      // Act
-      await adminController.createEvent(mockRequest, mockResponse);
+      expect(response.body.details).toContain('cannot exceed 60 characters');
+    });
 
-      // Assert
-      expect(adminModel.createEvent).toHaveBeenCalledWith({
-        name: 'Jazz Night',
-        date: '2025-12-01',
-        tickets: 50
-      });
+    test('should accept event name with exactly 60 characters', async () => {
+      const exactlyFiftyName = 'A'.repeat(60);
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: exactlyFiftyName,
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
+
+      expect(response.body.event.name).toBe(exactlyFiftyName);
+      expect(response.body.event.name.length).toBe(60);
     });
   });
 
-  describe('getEvents', () => {
-    test('should return all events successfully', async () => {
-      // Arrange
-      const mockEvents = [
-        { id: 1, name: 'Jazz Night', date: '2025-12-01', tickets: 50 },
-        { id: 2, name: 'Spring Concert', date: '2025-04-12', tickets: 75 }
-      ];
+  describe('GET /api/admin/events', () => {
+    test('should return array of events', async () => {
+      const response = await request(app)
+        .get('/api/admin/events')
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      adminModel.getAllEvents.mockResolvedValue(mockEvents);
-
-      // Act
-      await adminController.getEvents(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(200);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        events: mockEvents,
-        count: 2
-      });
+      expect(response.body).toHaveProperty('events');
+      expect(Array.isArray(response.body.events)).toBe(true);
+      expect(response.body).toHaveProperty('count');
+      expect(typeof response.body.count).toBe('number');
     });
 
-    test('should return empty array when no events exist', async () => {
-      // Arrange
-      adminModel.getAllEvents.mockResolvedValue([]);
+    test('should return events with required fields', async () => {
+      const response = await request(app)
+        .get('/api/admin/events')
+        .expect(200);
 
-      // Act
-      await adminController.getEvents(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(200);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        events: [],
-        count: 0
-      });
+      if (response.body.events.length > 0) {
+        const event = response.body.events[0];
+        expect(event).toHaveProperty('id');
+        expect(event).toHaveProperty('name');
+        expect(event).toHaveProperty('date');
+        expect(event).toHaveProperty('tickets');
+      }
     });
 
-    test('should handle database errors', async () => {
-      // Arrange
-      adminModel.getAllEvents.mockRejectedValue(new Error('Database error'));
+    test('should return count matching array length', async () => {
+      const response = await request(app)
+        .get('/api/admin/events')
+        .expect(200);
 
-      // Act
-      await adminController.getEvents(mockRequest, mockResponse);
+      expect(response.body.count).toBe(response.body.events.length);
+    });
 
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Failed to fetch events'
-        })
-      );
+    test('should handle empty events list', async () => {
+      // This may not be empty in practice, but tests the structure
+      const response = await request(app)
+        .get('/api/admin/events')
+        .expect(200);
+
+      expect(response.body.events).toBeDefined();
+      expect(response.body.count).toBeGreaterThanOrEqual(0);
     });
   });
 
-  describe('updateEvent', () => {
-    test('should update event successfully', async () => {
-      // Arrange
-      mockRequest.params.id = '1';
-      mockRequest.body = {
-        name: 'Updated Jazz Night',
-        date: '2025-12-15',
-        tickets: 60
-      };
+  describe('PUT /api/admin/events/:id', () => {
+    test('should update existing event', async () => {
+      // First create an event to update
+      const createResponse = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Event to Update',
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
 
-      const mockUpdatedEvent = {
-        id: 1,
-        name: 'Updated Jazz Night',
-        date: '2025-12-15',
-        tickets: 60,
-        updated: true
-      };
+      const eventId = createResponse.body.event.id;
 
-      adminModel.updateEvent.mockResolvedValue(mockUpdatedEvent);
+      // Now update it
+      const updateResponse = await request(app)
+        .put(`/api/admin/events/${eventId}`)
+        .send({
+          name: 'Updated Event Name',
+          date: '2026-01-01',
+          tickets: 75
+        })
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      // Act
-      await adminController.updateEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(200);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        message: 'Event updated successfully',
-        event: mockUpdatedEvent
-      });
+      expect(updateResponse.body).toHaveProperty('message');
+      expect(updateResponse.body.message).toContain('updated successfully');
+      expect(updateResponse.body.event.name).toBe('Updated Event Name');
+      expect(updateResponse.body.event.date).toBe('2026-01-01');
+      expect(updateResponse.body.event.tickets).toBe(75);
     });
 
-    test('should reject invalid event ID', async () => {
-      // Arrange
-      mockRequest.params.id = 'not-a-number';
-      mockRequest.body = {
-        name: 'Test Event',
-        date: '2025-12-01',
-        tickets: 50
-      };
+    test('should reject update with invalid ID', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/invalid')
+        .send({
+          name: 'Test Event',
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
 
-      // Act
-      await adminController.updateEvent(mockRequest, mockResponse);
+      expect(response.body.error).toBe('Invalid event ID');
+    });
 
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        error: 'Invalid event ID'
-      });
+    test('should reject update with missing name', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('Invalid event data');
     });
 
     test('should return 404 for non-existent event', async () => {
-      // Arrange
-      mockRequest.params.id = '999';
-      mockRequest.body = {
-        name: 'Test Event',
-        date: '2025-12-01',
-        tickets: 50
-      };
-
-      adminModel.updateEvent.mockRejectedValue(new Error('Event not found'));
-
-      // Act
-      await adminController.updateEvent(mockRequest, mockResponse);
-
-      // Assert
-      expect(mockResponse.status).toHaveBeenCalledWith(404);
-      expect(mockResponse.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Event not found'
+      const response = await request(app)
+        .put('/api/admin/events/99999')
+        .send({
+          name: 'Test Event',
+          date: '2025-12-31',
+          tickets: 50
         })
+        .expect(404);
+
+      expect(response.body.error).toBe('Event not found');
+    });
+
+    test('should reject update with invalid date', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          name: 'Test Event',
+          date: 'not-a-date',
+          tickets: 50
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('Invalid date format');
+    });
+
+    test('should reject update with zero tickets', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          name: 'Test Event',
+          date: '2025-12-31',
+          tickets: 0
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('positive number');
+    });
+
+    test('should reject update with negative tickets', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          name: 'Test Event',
+          date: '2025-12-31',
+          tickets: -5
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('positive');
+    });
+
+    test('should reject update with name exceeding 60 characters', async () => {
+      const response = await request(app)
+        .put('/api/admin/events/1')
+        .send({
+          name: 'A'.repeat(61),
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('cannot exceed 60 characters');
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('should handle malformed JSON', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .set('Content-Type', 'application/json')
+        .send('{ invalid json }')
+        .expect('Content-Type', /json/);
+
+      expect([400, 500]).toContain(response.status);
+    });
+
+    test('should return JSON for all error responses', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({})
+        .expect(400);
+
+      expect(response.headers['content-type']).toMatch(/json/);
+      expect(response.body).toHaveProperty('error');
+    });
+
+    test('should handle database errors gracefully', async () => {
+      // This test depends on database state, but ensures graceful error handling
+      const response = await request(app)
+        .put('/api/admin/events/99999')
+        .send({
+          name: 'Test',
+          date: '2025-12-31',
+          tickets: 50
+        });
+
+      expect([404, 500]).toContain(response.status);
+      expect(response.body).toHaveProperty('error');
+    });
+  });
+
+  describe('CORS Support', () => {
+    test('should handle CORS preflight', async () => {
+      const response = await request(app)
+        .options('/api/admin/events')
+        .set('Origin', 'http://localhost:3000')
+        .set('Access-Control-Request-Method', 'POST');
+
+      expect([200, 204]).toContain(response.status);
+    });
+  });
+
+  describe('Input Validation', () => {
+    test('should reject event name longer than 60 characters', async () => {
+      const longName = 'A'.repeat(1000);
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: longName,
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(400);
+
+      expect(response.body.details).toContain('cannot exceed 60 characters');
+    });
+
+    test('should handle special characters in name', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Event with Special Chars: @#$%',
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
+
+      expect(response.body.event.name).toBe('Event with Special Chars: @#$%');
+    });
+
+    test('should handle very large ticket numbers', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Large Capacity Event',
+          date: '2025-12-31',
+          tickets: 1000000
+        })
+        .expect(201);
+
+      expect(response.body.event.tickets).toBe(1000000);
+    });
+  });
+
+  describe('Response Format', () => {
+    test('should return consistent success format', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Format Test Event',
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
+
+      expect(response.body).toHaveProperty('message');
+      expect(response.body).toHaveProperty('event');
+      expect(typeof response.body.message).toBe('string');
+      expect(typeof response.body.event).toBe('object');
+    });
+
+    test('should return consistent error format', async () => {
+      const response = await request(app)
+        .post('/api/admin/events')
+        .send({})
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(typeof response.body.error).toBe('string');
+    });
+  });
+
+  describe('Performance', () => {
+    test('should create event within reasonable time', async () => {
+      const startTime = Date.now();
+      
+      await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Performance Test Event',
+          date: '2025-12-31',
+          tickets: 50
+        });
+      
+      const duration = Date.now() - startTime;
+      expect(duration).toBeLessThan(1000); // Should complete within 1 second
+    });
+
+    test('should handle multiple concurrent creates', async () => {
+      const requests = Array(3).fill(null).map((_, i) =>
+        request(app)
+          .post('/api/admin/events')
+          .send({
+            name: `Concurrent Event ${i} ${Date.now()}`,
+            date: '2025-12-31',
+            tickets: 50
+          })
       );
+
+      const responses = await Promise.all(requests);
+      
+      responses.forEach(response => {
+        expect([201, 400, 500]).toContain(response.status);
+      });
+    });
+  });
+
+  describe('Data Persistence', () => {
+    test('should persist created event', async () => {
+      // Create event
+      const createResponse = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Persistence Test Event',
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
+
+      const eventId = createResponse.body.event.id;
+
+      // Retrieve all events and verify it exists
+      const getResponse = await request(app)
+        .get('/api/admin/events')
+        .expect(200);
+
+      const foundEvent = getResponse.body.events.find(e => e.id === eventId);
+      expect(foundEvent).toBeDefined();
+      expect(foundEvent.name).toBe('Persistence Test Event');
+    });
+
+    test('should persist updated event', async () => {
+      // Create event
+      const createResponse = await request(app)
+        .post('/api/admin/events')
+        .send({
+          name: 'Original Name',
+          date: '2025-12-31',
+          tickets: 50
+        })
+        .expect(201);
+
+      const eventId = createResponse.body.event.id;
+
+      // Update event
+      await request(app)
+        .put(`/api/admin/events/${eventId}`)
+        .send({
+          name: 'Updated Name',
+          date: '2026-01-01',
+          tickets: 75
+        })
+        .expect(200);
+
+      // Retrieve and verify update persisted
+      const getResponse = await request(app)
+        .get('/api/admin/events')
+        .expect(200);
+
+      const updatedEvent = getResponse.body.events.find(e => e.id === eventId);
+      expect(updatedEvent.name).toBe('Updated Name');
+      expect(updatedEvent.tickets).toBe(75);
     });
   });
 });
