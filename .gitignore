@@ -27,6 +27,6 @@ frontend/dist/
 # Testing
 coverage/
 backend/shared-db/database.sqlite
-frontend/node_modules
+frontend/node_modules/
 frontend/package-lock.json
 
