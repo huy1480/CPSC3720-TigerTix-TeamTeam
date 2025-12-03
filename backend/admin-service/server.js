@@ -1,9 +1,3 @@
-/**
- * Admin Service Server
- * Main entry point for the admin microservice
- * Handles event creation and management
- */
-
 const express = require('express');
 const cors = require('cors');
 const adminRoutes = require('./routes/adminRoutes');
@@ -12,44 +6,25 @@ const setupDatabase = require('./setup');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Updated CORS configuration to accept multiple origins
-const allowedOrigins = process.env.ADMIN_ALLOWED_ORIGINS
-  ? process.env.ADMIN_ALLOWED_ORIGINS.split(',')
-  : [
-      'http://localhost:3000',
-      'https://3720-project.vercel.app',
-      'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app'
-    ];
-
-// Add wildcard support for Vercel preview deployments
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } 
-    // Allow any Vercel deployment URL
-    else if (origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    }
-    // Allow any localhost origin (for development)
-    else if (origin.startsWith('http://localhost:')) {
-      callback(null, true);
-    }
-    else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+// CORS Configuration - Allow BOTH Vercel deployments
+app.use(cors({
+  origin: [
+    // Development
+    'http://localhost:3000',
+    // Production deployments
+    'https://3720-project.vercel.app',
+    'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app',
+    // Preview/branch deployments (git branches)
+    'https://cpsc-3720-tiger-tix-team-team-vtc2-git-main-huy1480s-projects.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Set-Cookie']
-};
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 
-app.use(cors(corsOptions));
 app.use(express.json());
 
 if (typeof setupDatabase === 'function') {
@@ -74,4 +49,9 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Admin service running on port ${PORT}`);
+  console.log('CORS enabled for:');
+  console.log('  - http://localhost:3000');
+  console.log('  - https://3720-project.vercel.app');
+  console.log('  - https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app');
+  console.log('  - https://cpsc-3720-tiger-tix-team-team-vtc2-git-main-huy1480s-projects.vercel.app');
 });
