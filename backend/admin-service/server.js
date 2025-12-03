@@ -43,7 +43,6 @@ app.listen(PORT, () => {
   console.log(`Admin service running on port ${PORT}`);
   console.log('CORS enabled for:');
   console.log('  - http://localhost:3000');
-  console.log('  - https://3720-project.vercel.app');
   console.log('  - https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app');
   console.log('  - https://cpsc-3720-tiger-tix-team-team-vtc2-git-main-huy1480s-projects.vercel.app');
 });
