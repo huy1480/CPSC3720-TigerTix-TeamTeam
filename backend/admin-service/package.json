@@ -1,7 +1,7 @@
 {
-  "name": "tigertix-client-service",
+  "name": "tigertix-admin-service",
   "version": "1.0.0",
-  "description": "TigerTix Client Service - handles event browsing, ticket purchases, and LLM interactions",
+  "description": "TigerTix Admin Service - handles event management and booking administration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "ticketing",
+    "admin",
     "events",
     "express"
   ],
