@@ -1,75 +1,123 @@
-# CPSC3720-TigerTix-TeamTeam
+# Event Ticket Booking System --- Microservices Architecture
 
-## Event Ticket Booking System — Microservices Architecture
-
-A lightweight microservices-based ticket-booking system featuring a React 19 frontend, modular Node.js backend services, shared SQLite storage, JWT authentication, and LLM-powered natural-language booking with the Gemini API.
+A lightweight microservices-based ticket-booking system featuring a
+React 19 frontend, modular Node.js backend services, shared SQLite
+storage, JWT authentication, and LLM-powered natural-language booking
+with the Gemini API.
 
 Live Deployment: **https://3720-sprint4.vercel.app/**
 
----
+## 🚀 Project Overview
 
-## Project Overview
+This project delivers a complete event ticket-booking web application
+using a decoupled microservices architecture. The backend consists of
+three independently running Node.js + Express services for client
+operations, admin event management, and user authentication. All
+services share a single SQLite database. The frontend communicates with
+the client service through a configured proxy and includes Gemini-based
+natural-language booking support.
 
-This project delivers a complete event ticket-booking web application using a decoupled microservices architecture. The backend consists of three independently running Node.js + Express services for:
+## 🧱 Tech Stack
 
-- **Client operations** (public event browsing & booking)
-- **Admin event management**
-- **User authentication**
+### Frontend
 
-All services share a single SQLite database file, simplifying deployment while maintaining clear service boundaries.
+-   React 19 (CRA)
+-   Located at `frontend/`
+-   Proxy to client-service on port 6001
 
-The frontend is a **React 19 CRA** project that communicates with the client-service through a configured proxy.
+### Backend Services
 
-The system includes an LLM integration using **Gemini**, enabling natural-language ticket-booking commands.
+#### Client Service
 
----
+-   Event browsing & booking
+-   LLM integration (Gemini)
+-   Paths: controllers, models, routes
 
-## Tech Stack
+#### Admin Service
 
-### **Frontend**
-- React 19 (Create React App)
-- Located at: `frontend/`
-- CRA proxy routes API calls to the client-service on **port 6001**
-- Handles:
-  - Event browsing
-  - Ticket booking
-  - Chat interface powered by the LLM service
+-   Full CRUD for events
+-   Paths: server.js, adminRoutes.js, adminModel.js
 
-### **Backend Services (Node.js + Express)**
+#### User Authentication Service
 
-#### **1. Client Service**
-Handles all user-facing booking and event operations.
+-   Registration, login, JWT, /me lookup
+-   bcrypt + JWT
+-   Paths: authRoutes.js, authMiddleware.js, userModel.js
 
-- Path: `backend/client-service/`
-- Routes: `routes/clientRoutes.js`
-- Logic: `controllers/clientController.js`, `models/clientModel.js`
-- LLM integration: `services/llmService.js`
+### Database
 
-#### **2. Admin Service**
-Provides full CRUD for event management.
+-   Shared SQLite file: `backend/shared-db/database.sqlite`
 
-- Path: `backend/admin-service/`
-- Code paths: `server.js`, `routes/adminRoutes.js`, `models/adminModel.js`
+### Authentication
 
-#### **3. User Authentication Service**
-Manages:
-- Registration  
-- Login  
-- JWT issuance  
-- `/me` session lookups  
+-   JWT with HTTP-only cookies and headers
+-   bcrypt hashing
 
-Uses:
-- JWT (cookies + headers)
-- bcrypt
+### LLM Integration
 
-Paths:
-- `routes/authRoutes.js`
-- `middleware/authMiddleware.js`
-- `models/userModel.js`
+-   Gemini API (gemini-2.5-flash)
 
-### **Database**
-A single SQLite database shared by all services:
+## 🏗 Architecture Summary
 
+    frontend/ → React 19 (CRA)
+      ↳ proxy → http://localhost:6001
 
+    backend/
+      ├── client-service/
+      ├── admin-service/
+      ├── user-authentication/
+      └── shared-db/database.sqlite
 
+## ⚙️ Environment Variables
 
+### Client Service
+
+    NODE_ENV=production
+    NODE_VERSION=20
+    JWT_SECRET=YOUR_SECRET_HERE
+    GEMINI_API_KEY=
+    GEMINI_MODEL=gemini-2.5-flash
+    CLIENT_ALLOWED_ORIGINS=https://3720-sprint4.vercel.app
+
+### User Authentication Service
+
+    NODE_ENV=production
+    NODE_VERSION=20
+    JWT_SECRET=YOUR_SECRET_HERE
+    AUTH_ALLOWED_ORIGINS=https://3720-sprint4.vercel.app
+
+### Admin Service
+
+    NODE_ENV=production
+    NODE_VERSION=20
+    ADMIN_ALLOWED_ORIGINS=https://3720-sprint4.vercel.app
+
+## 🧪 Regression Tests
+
+Run all Jest tests:
+
+    npx jest
+
+Watch mode:
+
+    npx jest --watch
+
+Specific test:
+
+    npx jest path/to/your.test.js
+
+Coverage:
+
+    npx jest --coverage
+
+## 👥 Team Members
+
+-   Luke Miller
+-   Hayden Uy
+
+Instructor: Julian Brinkley\
+TAs: Colt Doster, Atik Enam
+
+## 📄 License
+
+MIT License (2025)
