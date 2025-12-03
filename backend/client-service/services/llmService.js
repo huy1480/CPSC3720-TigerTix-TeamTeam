@@ -1,6 +1,6 @@
-const http = require('http');
 const https = require('https');
-const { URL } = require('url');
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
+const GEMINI_MODEL = (process.env.GEMINI_MODEL || '').trim();
 
 const numberWords = {
   one: 1, two: 2, three: 3, four: 4, five: 5,
@@ -8,31 +8,40 @@ const numberWords = {
   eleven: 11, twelve: 12
 };
 
-const OLLAMA_HOST = process.env.OLLAMA_HOST?.trim() || 'http://127.0.0.1:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL?.trim() || 'tinyllama:latest';
+function postToGemini(prompt, model) {
+  if (!GEMINI_API_KEY) {
+    return Promise.reject(new Error('GEMINI_API_KEY is not configured'));
+  }
 
-function postJson(endpoint, payload) {
-  return new Promise((resolve, reject) => {
-    let target;
-    try {
-      target = new URL(endpoint, OLLAMA_HOST);
-    } catch (error) {
-      return reject(new Error(`Invalid Ollama host: ${error.message}`));
-    }
+  const targetModel =
+    model ||
+    GEMINI_MODEL ||
+    'gemini-2.5-flash';
 
-    const data = JSON.stringify(payload);
-    const isSecure = target.protocol === 'https:';
-    const transport = isSecure ? https : http;
-
-    const request = transport.request(
+  const payload = JSON.stringify({
+    contents: [
       {
-        hostname: target.hostname,
-        port: target.port || (isSecure ? 443 : 80),
-        path: `${target.pathname}${target.search}`,
+        role: 'user',
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.9
+    }
+  });
+
+  const path = `/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        hostname: 'generativelanguage.googleapis.com',
+        path,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(data)
+          'Content-Length': Buffer.byteLength(payload)
         },
         timeout: 15000
       },
@@ -42,19 +51,19 @@ function postJson(endpoint, payload) {
         response.on('data', (chunk) => (body += chunk));
         response.on('end', () => {
           if (response.statusCode < 200 || response.statusCode >= 300) {
-            return reject(new Error(`Ollama status ${response.statusCode}: ${body}`));
+            return reject(new Error(`Gemini status ${response.statusCode}: ${body}`));
           }
           try {
             resolve(JSON.parse(body));
           } catch (err) {
-            reject(new Error(`Bad JSON from Ollama: ${err.message}`));
+            reject(new Error(`Bad JSON from Gemini: ${err.message}`));
           }
         });
       }
     );
 
     request.on('error', reject);
-    request.write(data);
+    request.write(payload);
     request.end();
   });
 }
@@ -108,35 +117,61 @@ CRITICAL:
 - tickets must be a number`.trim();
 }
 
-async function callOllama(text, events) {
+// Prefer models listed as available for generateContent from the API listing
+const MODEL_FALLBACKS = [
+  () => GEMINI_MODEL && GEMINI_MODEL.trim(),
+  () => 'gemini-2.5-flash',
+  () => 'gemini-2.5-pro',
+  () => 'gemini-flash-latest',
+  () => 'gemini-pro-latest',
+  () => 'gemini-2.0-flash',
+  () => 'gemini-2.0-flash-001',
+  () => 'gemini-2.0-flash-lite-001'
+].filter(Boolean);
+
+async function callGemini(text, events) {
   const systemPrompt = buildSystemPrompt(events);
 
-  const payload = {
-    model: OLLAMA_MODEL,
-    prompt: `${systemPrompt}\n\nUser: ${text}\nJSON:`,
-    format: 'json',
-    stream: false,
-    options: {
-      temperature: 0.1,
-      top_p: 0.9
+  const prompt = `${systemPrompt}\n\nUser: ${text}\nJSON:`;
+  let lastError;
+
+  for (const getModel of MODEL_FALLBACKS) {
+    const model = getModel();
+    if (!model) continue;
+    try {
+      const response = await postToGemini(prompt, model);
+
+      const candidateTexts =
+        response?.candidates
+          ?.flatMap((candidate) => candidate?.content?.parts || [])
+          .map((part) => part?.text)
+          .filter(Boolean) || [];
+
+      const raw = candidateTexts.join('\n').trim();
+      console.log(`🔍 RAW MODEL OUTPUT (${model}):`, raw);
+
+      const parsed = safeJsonParse(raw);
+      if (!parsed) {
+        throw new Error('Model did not return valid JSON.');
+      }
+
+      return parsed;
+    } catch (err) {
+      lastError = err;
+      // If 404 or model not found, try next model
+      if (String(err.message).includes('404')) {
+        console.warn(`⚠️ Model ${getModel()} unavailable, trying next fallback`);
+        continue;
+      }
+      throw err;
     }
-  };
-
-  const response = await postJson('/api/generate', payload);
-
-  if (!response?.response) {
-    throw new Error('Unexpected Ollama format — missing response.response');
   }
 
-  const raw = response.response.trim();
-  console.log("🔍 RAW MODEL OUTPUT:", raw);
-
-  const parsed = safeJsonParse(raw);
-  if (!parsed) {
-    throw new Error('Model did not return valid JSON.');
+  if (lastError) {
+    throw lastError;
   }
 
-  return parsed;
+  throw new Error('No Gemini models available');
 }
 
 function coerceTicketCount(value) {
@@ -349,7 +384,7 @@ function normalizePayload(payload, normalizedEvents, originalText) {
 
   const result = {
     intent: intent,
-    source: 'ollama',
+    source: 'gemini',
     rawEventName: rawEventName,
     eventName: rawEventName,
     needsConfirmation: Boolean(payload.needsConfirmation || payload.needConfirmation)
@@ -422,7 +457,7 @@ exports.parseUserInput = async (text, events = []) => {
   }));
 
   try {
-    const llmPayload = await callOllama(text, events);
+    const llmPayload = await callGemini(text, events);
     console.log('🔍 Parsed LLM payload:', JSON.stringify(llmPayload, null, 2));
     const result = normalizePayload(llmPayload, normalizedEvents, text);
     console.log('✅ Final result:', JSON.stringify(result, null, 2));
@@ -431,7 +466,7 @@ exports.parseUserInput = async (text, events = []) => {
     console.error("LLM ERROR:", err);
     throw {
       status: 503,
-      message: 'Failed to parse request with the Ollama model.',
+      message: 'Failed to parse request with the Gemini model.',
       details: err.message
     };
   }

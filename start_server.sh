@@ -11,17 +11,25 @@ cleanup() {
 	exit 0
 }
 
-echo "Starting ollama";
-ollama run tinyllama &
+start_with_env() {
+	# Usage: start_with_env path/to/envfile command args...
+	local env_file="$1"; shift
+	(
+		set -a
+		[ -f "$env_file" ] && . "$env_file"
+		set +a
+		"$@"
+	) &
+}
 
 echo "Starting client service";
-node ./backend/client-service/server.js &
+start_with_env ./backend/client-service/.env.production node ./backend/client-service/server.js
 
 echo "Starting admin service";
-node ./backend/admin-service/server.js &
+start_with_env ./backend/admin-service/.env.production node ./backend/admin-service/server.js
 
 echo "Starting user authentication service";
-node ./backend/user-authentication/server.js &
+start_with_env ./backend/user-authentication/.env.production node ./backend/user-authentication/server.js
 
 echo "Starting frontend";
 npm start --prefix ./frontend
