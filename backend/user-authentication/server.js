@@ -15,7 +15,8 @@ if (allowedOrigins.length === 0) {
   allowedOrigins.push(
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app'
+    'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app',
+    'https://3720-sprint4.vercel.app/'
   );
 }
 
@@ -54,6 +55,8 @@ app.listen(PORT, () => {
   console.log('  - http://localhost:3000');
   console.log('  - https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app');
   console.log('  - https://cpsc-3720-tiger-tix-team-team-vtc2-git-main-huy1480s-projects.vercel.app');
+  console.log('  -  https://3720-sprint4.vercel.app/');
+
 });
 
 module.exports = app;
