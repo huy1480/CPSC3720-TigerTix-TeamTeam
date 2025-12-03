@@ -12,7 +12,7 @@ const allowedOrigins = process.env.AUTH_ALLOWED_ORIGINS
   : [
       'http://localhost:3000',
       'https://3720-project.vercel.app',
-      'https://cpsc-3720-tiger-tix-team-team-vtc2-git-main-huy1480s-projects.vercel.app'
+      'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app'
     ];
 
 // Add wildcard support for Vercel preview deployments
