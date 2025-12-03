@@ -17,6 +17,35 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Ensure bookings table exists for transactional storage
 db.serialize(() => {
+  // Ensure events table exists (shared schema)
+  db.run(
+    `CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      date TEXT NOT NULL,
+      tickets INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`
+  );
+
+  // Seed events if empty
+  db.get('SELECT COUNT(*) as count FROM events', [], (err, row) => {
+    if (err) {
+      console.error('Error checking events count:', err.message);
+    } else if (row.count === 0) {
+      const seedStmt = db.prepare(
+        'INSERT INTO events (name, date, tickets) VALUES (?, ?, ?)'
+      );
+      [
+        ['Homecoming Football Game', '2025-10-15', 50],
+        ['Spring Concert', '2025-04-12', 75],
+        ['Hackathon 2025', '2025-11-08', 100]
+      ].forEach((event) => seedStmt.run(event));
+      seedStmt.finalize();
+      console.log('Seeded default events into shared database.');
+    }
+  });
+
   db.run(
     `CREATE TABLE IF NOT EXISTS bookings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
