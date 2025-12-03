@@ -8,15 +8,7 @@ const PORT = process.env.PORT || 5001;
 
 // CORS Configuration - Allow BOTH Vercel deployments
 app.use(cors({
-  origin: [
-    // Development
-    'http://localhost:3000',
-    // Production deployments
-    'https://3720-project.vercel.app',
-    'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app',
-    // Preview/branch deployments (git branches)
-    'https://cpsc-3720-tiger-tix-team-team-vtc2-git-main-huy1480s-projects.vercel.app'
-  ],
+  origin: 'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
