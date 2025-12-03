@@ -7,7 +7,7 @@ with the Gemini API.
 
 Live Deployment: **https://3720-sprint4.vercel.app/**
 
-## 🚀 Project Overview
+## Project Overview
 
 This project delivers a complete event ticket-booking web application
 using a decoupled microservices architecture. The backend consists of
@@ -17,7 +17,7 @@ services share a single SQLite database. The frontend communicates with
 the client service through a configured proxy and includes Gemini-based
 natural-language booking support.
 
-## 🧱 Tech Stack
+## Tech Stack
 
 ### Frontend
 
@@ -57,7 +57,7 @@ natural-language booking support.
 
 -   Gemini API (gemini-2.5-flash)
 
-## 🏗 Architecture Summary
+## Architecture Summary
 
     frontend/ → React 19 (CRA)
       ↳ proxy → http://localhost:6001
@@ -68,7 +68,7 @@ natural-language booking support.
       ├── user-authentication/
       └── shared-db/database.sqlite
 
-## ⚙️ Environment Variables
+## Environment Variables
 
 ### Client Service
 
@@ -92,7 +92,7 @@ natural-language booking support.
     NODE_VERSION=20
     ADMIN_ALLOWED_ORIGINS=https://3720-sprint4.vercel.app
 
-## 🧪 Regression Tests
+## Regression Tests
 
 Run all Jest tests:
 
@@ -110,7 +110,7 @@ Coverage:
 
     npx jest --coverage
 
-## 👥 Team Members
+## Team Members
 
 -   Luke Miller
 -   Hayden Uy
@@ -118,6 +118,6 @@ Coverage:
 Instructor: Julian Brinkley\
 TAs: Colt Doster, Atik Enam
 
-## 📄 License
+## License
 
 MIT License (2025)
