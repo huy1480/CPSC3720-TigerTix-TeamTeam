@@ -3,8 +3,8 @@ import './App.css';
 import microphoneIcon from './microphone.png';
 import beepSound from './Beep.mp3';
 
-const AUTH_API_BASE =
-  process.env.REACT_APP_AUTH_URL || 'http://localhost:6002';
+const CLIENT_API_BASE = process.env.REACT_APP_CLIENT_URL || 'http://localhost:6001';
+const AUTH_API_BASE = process.env.REACT_APP_AUTH_URL || 'http://localhost:6002';
 
 const createMessage = (role, text) => ({
   id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -316,7 +316,7 @@ function App() {
     setAssistantBusy(true);
 
     try {
-      const res = await callClientService('/api/llm/parse', {
+        const res = await callClientService(`${CLIENT_API_BASE}/api/llm/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: transcript })
@@ -369,7 +369,7 @@ function App() {
     const fetchEvents = async () => {
       setLoadingEvents(true);
       try {
-        const res = await callClientService('/api/events');
+          const res = await callClientService(`${CLIENT_API_BASE}/api/events`);
         if (!res.ok) {
           throw new Error('Unable to load events');
         }
@@ -400,8 +400,7 @@ function App() {
     setAssistantBusy(true);
 
     try {
-      const res = await callClientService('/api/llm/parse', {
-        method: 'POST',
+        const res = await callClientService(`${CLIENT_API_BASE}/api/bookings/confirm`, {        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: trimmed })
       });
@@ -455,8 +454,7 @@ function App() {
 
     setAssistantBusy(true);
     try {
-      const res = await callClientService('/api/bookings/confirm', {
-        method: 'POST',
+        const res = await callClientService(`${CLIENT_API_BASE}/api/bookings/confirm`, {        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventId: pendingBooking.eventId,
@@ -499,8 +497,7 @@ function App() {
     }
 
     try {
-      const res = await callClientService(`/api/events/${event.id}/purchase`, {
-        method: 'POST',
+        const res = await callClientService(`${CLIENT_API_BASE}/api/events/${event.id}/purchase`, {        method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
