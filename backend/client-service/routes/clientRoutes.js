@@ -9,7 +9,7 @@ const clientController = require('../controllers/clientController');
 const {
   requireAuth,
   attachUserIfAvailable
-} = require('../../user-authentication/middleware/authMiddleware');
+} = require('../middleware/authMiddleware');
 
 router.use(attachUserIfAvailable);
 

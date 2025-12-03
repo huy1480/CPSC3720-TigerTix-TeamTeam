@@ -5,6 +5,8 @@ import beepSound from './Beep.mp3';
 
 const AUTH_API_BASE =
   process.env.REACT_APP_AUTH_URL || 'http://localhost:6002';
+const CLIENT_API_BASE =
+  process.env.REACT_APP_CLIENT_URL || 'http://localhost:6001';
 
 const createMessage = (role, text) => ({
   id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -50,6 +52,9 @@ function App() {
   const [eventsError, setEventsError] = useState('');
   const [bannerMessage, setBannerMessage] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const [authToken, setAuthToken] = useState(
+    () => localStorage.getItem('tt_auth_token') || ''
+  );
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({ email: '', password: '' });
   const [authLoading, setAuthLoading] = useState(false);
@@ -73,12 +78,22 @@ function App() {
     setAuthMode('login');
     setAuthError('Session expired. Please log in again.');
     setAuthForm({ email: '', password: '' });
+    setAuthToken('');
+    localStorage.removeItem('tt_auth_token');
   }, []);
 
   const callClientService = useCallback(
     async (input, options = {}) => {
-      const response = await fetch(input, {
+      const url = input.startsWith('http')
+        ? input
+        : `${CLIENT_API_BASE}${input}`;
+      const headers = {
+        ...(options.headers || {}),
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      };
+      const response = await fetch(url, {
         ...options,
+        headers,
         credentials: 'include'
       });
 
@@ -88,7 +103,7 @@ function App() {
 
       return response;
     },
-    [handleAuthExpired]
+    [handleAuthExpired, authToken]
   );
 
   const appendMessage = useCallback((role, text) => {
@@ -181,6 +196,10 @@ function App() {
         throw new Error(data.error || 'Unable to authenticate');
       }
 
+      if (data.token) {
+        setAuthToken(data.token);
+        localStorage.setItem('tt_auth_token', data.token);
+      }
       setCurrentUser(data.user);
       setBannerMessage(
         authMode === 'login'
@@ -200,7 +219,10 @@ function App() {
     try {
       await fetch(`${AUTH_API_BASE}/api/auth/logout`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: authToken
+          ? { Authorization: `Bearer ${authToken}` }
+          : undefined
       });
     } catch (error) {
       console.warn('Logout failed:', error);
@@ -212,14 +234,18 @@ function App() {
       setAuthMode('login');
       setAuthForm({ email: '', password: '' });
       setBannerMessage('Logged out successfully.');
+      setAuthToken('');
+      localStorage.removeItem('tt_auth_token');
     }
   };
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
+      if (!authToken) return;
       try {
         const res = await fetch(`${AUTH_API_BASE}/api/auth/me`, {
-          credentials: 'include'
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${authToken}` }
         });
 
         if (res.ok) {
@@ -232,7 +258,7 @@ function App() {
     };
 
     fetchCurrentUser();
-  }, []);
+  }, [authToken]);
 
   const handleParseResponse = useCallback((data) => {
     switch (data.intent) {

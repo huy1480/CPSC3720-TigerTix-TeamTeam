@@ -4,11 +4,28 @@ const cookieParser = require('cookie-parser');
 const clientRoutes = require('./routes/clientRoutes');
 
 const app = express();
-const PORT = 6001;
+const PORT = process.env.PORT || 6001;
 
-// CORS Configuration - Allow BOTH Vercel deployments
+const allowedOrigins = (process.env.CLIENT_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+if (allowedOrigins.length === 0) {
+  allowedOrigins.push(
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app'
+  );
+}
+
 app.use(cors({
-  origin: 'https://cpsc-3720-tiger-tix-team-team-vtc2.vercel.app',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
