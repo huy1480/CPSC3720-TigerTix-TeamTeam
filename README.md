@@ -6,6 +6,7 @@ storage, JWT authentication, and LLM-powered natural-language booking
 with the Gemini API.
 
 Live Deployment: **https://3720-sprint4.vercel.app/**
+
 Presentation: **https://drive.google.com/file/d/1mNhGYnpn8ifHcyzRRf7XoxQ2w5a4lygy/view?usp=sharing**
 
 ## Project Overview
